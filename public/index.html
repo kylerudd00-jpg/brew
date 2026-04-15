@@ -66,6 +66,7 @@
         <span class="hchip">🏭 Live tap lists</span>
         <span class="hchip">⭐ AI-scored rankings</span>
         <span class="hchip">📅 Local events</span>
+        <button class="hchip hchip-quiz" id="quizChip" type="button">🎯 Match My Taste</button>
       </div>
     </div>
 
@@ -154,6 +155,86 @@
   <span class="footer-logo">Hops &amp; Finds</span>
   <span>Powered by Google Places &amp; Eventbrite</span>
 </footer>
+
+<!-- ====================================================== TASTE QUIZ OVERLAY -->
+<div class="quiz-overlay" id="quizOverlay" hidden>
+  <div class="quiz-modal" id="quizModal" role="dialog" aria-modal="true" aria-label="Taste profile quiz">
+    <button class="quiz-close" id="quizClose" aria-label="Close quiz">✕</button>
+    <div class="quiz-progress" id="quizProgress"><div class="quiz-bar" id="quizBar"></div></div>
+    <div class="quiz-steps" id="quizSteps">
+
+      <!-- Step 1: Bitterness -->
+      <div class="quiz-step active" data-step="0">
+        <p class="quiz-q-num">1 of 3</p>
+        <h3 class="quiz-q">How do you like your hops?</h3>
+        <div class="quiz-options">
+          <button class="quiz-opt" data-step="0" data-val="0">
+            <span class="quiz-opt-icon">🌾</span>
+            <span class="quiz-opt-label">Keep it smooth</span>
+            <span class="quiz-opt-sub">Low bitterness</span>
+          </button>
+          <button class="quiz-opt" data-step="0" data-val="1">
+            <span class="quiz-opt-icon">🍃</span>
+            <span class="quiz-opt-label">Balanced</span>
+            <span class="quiz-opt-sub">Medium hoppiness</span>
+          </button>
+          <button class="quiz-opt" data-step="0" data-val="2">
+            <span class="quiz-opt-icon">🌿</span>
+            <span class="quiz-opt-label">Bring the hops</span>
+            <span class="quiz-opt-sub">The more the better</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Color / body -->
+      <div class="quiz-step" data-step="1">
+        <p class="quiz-q-num">2 of 3</p>
+        <h3 class="quiz-q">What color calls to you?</h3>
+        <div class="quiz-options">
+          <button class="quiz-opt" data-step="1" data-val="0">
+            <span class="quiz-opt-icon">☀️</span>
+            <span class="quiz-opt-label">Light &amp; crisp</span>
+            <span class="quiz-opt-sub">Golden, wheat, lager</span>
+          </button>
+          <button class="quiz-opt" data-step="1" data-val="1">
+            <span class="quiz-opt-icon">🍺</span>
+            <span class="quiz-opt-label">Amber &amp; warm</span>
+            <span class="quiz-opt-sub">Amber, red, pale ale</span>
+          </button>
+          <button class="quiz-opt" data-step="1" data-val="2">
+            <span class="quiz-opt-icon">🌑</span>
+            <span class="quiz-opt-label">Dark &amp; bold</span>
+            <span class="quiz-opt-sub">Stout, porter, barleywine</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Flavor -->
+      <div class="quiz-step" data-step="2">
+        <p class="quiz-q-num">3 of 3</p>
+        <h3 class="quiz-q">Pick your flavor vibe:</h3>
+        <div class="quiz-options">
+          <button class="quiz-opt" data-step="2" data-val="0">
+            <span class="quiz-opt-icon">🍊</span>
+            <span class="quiz-opt-label">Fruity &amp; juicy</span>
+            <span class="quiz-opt-sub">Tropical, citrus, fresh</span>
+          </button>
+          <button class="quiz-opt" data-step="2" data-val="1">
+            <span class="quiz-opt-icon">🌾</span>
+            <span class="quiz-opt-label">Malty &amp; toasty</span>
+            <span class="quiz-opt-sub">Caramel, roast, chocolate</span>
+          </button>
+          <button class="quiz-opt" data-step="2" data-val="2">
+            <span class="quiz-opt-icon">🍋</span>
+            <span class="quiz-opt-label">Tart &amp; funky</span>
+            <span class="quiz-opt-sub">Sour, wild, earthy</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 <!-- ====================================================== BEER DETAIL OVERLAY -->
 <div class="detail-overlay" id="detailOverlay" aria-modal="true" role="dialog" aria-label="Beer details" hidden>

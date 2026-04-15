@@ -1694,3 +1694,345 @@ a.ev-name:hover { color: var(--amber-lt); }
   /* Events grid single column */
   .events-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   IBU / Bitterness chip
+   ============================================================ */
+.ibu-chip {
+  font-family: var(--cond);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  border-radius: 4px;
+  padding: 0.18rem 0.55rem;
+  white-space: nowrap;
+}
+/* Level 0: not bitter → soft green */
+.ibu-level-0 { color: var(--hop); background: rgba(122,184,48,0.08); border: 1px solid rgba(122,184,48,0.22); }
+/* Level 1: mild → muted */
+.ibu-level-1 { color: var(--cream-dim); background: rgba(245,238,216,0.06); border: 1px solid var(--border); }
+/* Level 2: medium → amber */
+.ibu-level-2 { color: var(--amber); background: rgba(232,162,42,0.08); border: 1px solid rgba(232,162,42,0.25); }
+/* Level 3: bitter → orange */
+.ibu-level-3 { color: #f07a30; background: rgba(240,122,48,0.08); border: 1px solid rgba(240,122,48,0.25); }
+/* Level 4: very bitter → red-orange */
+.ibu-level-4 { color: #e0502a; background: rgba(224,80,42,0.08); border: 1px solid rgba(224,80,42,0.28); }
+
+/* Detail sheet IBU fill colors */
+.detail-ibu-fill { background: linear-gradient(90deg, var(--hop), var(--amber)); }
+.ibu-fill-level-0 { background: var(--hop); }
+.ibu-fill-level-1 { background: linear-gradient(90deg, var(--hop), var(--amber-dim)); }
+.ibu-fill-level-2 { background: linear-gradient(90deg, var(--amber-dim), var(--amber)); }
+.ibu-fill-level-3 { background: linear-gradient(90deg, var(--amber), #f07a30); }
+.ibu-fill-level-4 { background: linear-gradient(90deg, #f07a30, #e0502a); }
+
+/* ============================================================
+   Hidden Gem & Seasonal badges
+   ============================================================ */
+.gem-badge {
+  font-family: var(--cond);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #9b8dff;
+  background: rgba(155,141,255,0.08);
+  border: 1px solid rgba(155,141,255,0.25);
+  border-radius: 4px;
+  padding: 0.18rem 0.55rem;
+  white-space: nowrap;
+}
+
+.seasonal-badge {
+  font-family: var(--cond);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #7dd3a8;
+  background: rgba(125,211,168,0.08);
+  border: 1px solid rgba(125,211,168,0.22);
+  border-radius: 4px;
+  padding: 0.18rem 0.55rem;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   Wishlist heart button
+   ============================================================ */
+.fc-name-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.fc-name-row .fc-name { margin-bottom: 0; flex: 1; min-width: 0; }
+
+.wishlist-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+}
+.wishlist-btn:hover { background: var(--card-hi); color: var(--amber); border-color: var(--border-hi); }
+.wishlist-btn:active { transform: scale(0.88); }
+.wishlist-btn.active { color: var(--amber); border-color: rgba(232,162,42,0.35); background: rgba(232,162,42,0.08); }
+
+.wishlist-btn-sm {
+  width: 28px; height: 28px;
+  margin-right: 0.4rem;
+  align-self: center;
+}
+
+/* ============================================================
+   Personalized banner
+   ============================================================ */
+.personalized-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: rgba(232,162,42,0.06);
+  border: 1px solid rgba(232,162,42,0.2);
+  border-radius: var(--r);
+  padding: 0.6rem 1rem;
+  font-size: 0.8rem;
+  color: var(--amber-lt);
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.pb-reset {
+  font-family: var(--cond);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.65rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+.pb-reset:hover { color: var(--cream-dim); border-color: var(--border-hi); }
+
+/* ============================================================
+   Quiz chip in hero
+   ============================================================ */
+.hchip-quiz {
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.hchip-quiz:hover {
+  background: rgba(232,162,42,0.18);
+  border-color: rgba(232,162,42,0.4);
+  color: var(--amber-lt);
+}
+.hchip-quiz.active {
+  background: rgba(232,162,42,0.14);
+  border-color: rgba(232,162,42,0.4);
+  color: var(--amber-lt);
+}
+
+/* ============================================================
+   Taste Quiz Modal
+   ============================================================ */
+.quiz-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(5,4,10,0.8);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: overlay-in 0.2s ease both;
+}
+.quiz-overlay[hidden] { display: none !important; }
+
+.quiz-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-lg);
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+  animation: sheet-up 0.28s cubic-bezier(0.34,1.2,0.64,1) both;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  position: relative;
+}
+
+.quiz-progress {
+  height: 3px;
+  background: var(--border);
+}
+.quiz-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--amber-dim), var(--amber-lt));
+  border-radius: 0 100px 100px 0;
+  transition: width 0.35s cubic-bezier(0.34,1.2,0.64,1);
+  width: 33%;
+}
+
+.quiz-close {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.15s, color 0.15s;
+}
+.quiz-close:hover { background: var(--card-hi); color: var(--cream); }
+
+.quiz-steps { position: relative; }
+
+.quiz-step {
+  display: none;
+  flex-direction: column;
+  padding: 1.75rem 1.5rem 1.5rem;
+  gap: 1rem;
+}
+.quiz-step.active { display: flex; animation: sheet-up 0.22s ease both; }
+
+.quiz-q-num {
+  font-family: var(--cond);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amber);
+  opacity: 0.7;
+}
+
+.quiz-q {
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--cream);
+  line-height: 1.2;
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.quiz-opt {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  padding: 0.85rem 1rem;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  cursor: pointer;
+}
+.quiz-opt:hover {
+  border-color: var(--border-hi);
+  background: var(--card-hi);
+  transform: translateX(3px);
+}
+.quiz-opt.selected {
+  border-color: var(--amber);
+  background: rgba(232,162,42,0.08);
+}
+.quiz-opt:active { transform: scale(0.98); }
+
+.quiz-opt-icon { font-size: 1.4rem; flex-shrink: 0; }
+
+.quiz-opt-label {
+  font-family: var(--cond);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  line-height: 1.2;
+}
+
+.quiz-opt-sub {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+  display: block;
+}
+
+/* ============================================================
+   Detail sheet bar label row (ABV / Bitterness)
+   ============================================================ */
+.detail-bar-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.35rem;
+}
+.detail-bar-label-txt {
+  font-family: var(--cond);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.detail-bar-val {
+  font-family: var(--cond);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--amber-lt);
+}
+
+/* ============================================================
+   Detail food pairing
+   ============================================================ */
+.detail-food-pairing {
+  font-size: 0.88rem;
+  color: var(--cream-dim);
+  line-height: 1.6;
+}
+
+/* ============================================================
+   Detail overlay close animation
+   ============================================================ */
+.detail-overlay.closing {
+  animation: overlay-out 0.15s ease both;
+}
+@keyframes overlay-out {
+  to { opacity: 0; }
+}
+
+/* ============================================================
+   Detail sheet — remove the [hidden] override conflict
+   (overlay visibility managed via hidden attribute in JS)
+   ============================================================ */
+.detail-overlay:not([hidden]) {
+  display: flex;
+}
+
+/* ============================================================
+   Mobile quiz tweaks
+   ============================================================ */
+@media (max-width: 480px) {
+  .quiz-modal { border-radius: var(--r-lg) var(--r-lg) 0 0; align-self: flex-end; }
+  .quiz-overlay { align-items: flex-end; padding: 0; }
+  .quiz-opt { padding: 0.7rem 0.85rem; }
+  .quiz-opt-icon { font-size: 1.2rem; }
+}

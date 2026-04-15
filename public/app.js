@@ -49,6 +49,203 @@ const detailOverlay = document.getElementById('detailOverlay');
 const detailSheet   = document.getElementById('detailSheet');
 const detailContent = document.getElementById('detailContent');
 const detailClose   = document.getElementById('detailClose');
+const quizOverlay   = document.getElementById('quizOverlay');
+const quizClose     = document.getElementById('quizClose');
+const quizBar       = document.getElementById('quizBar');
+const quizChip      = document.getElementById('quizChip');
+
+// ── Taste Quiz ────────────────────────────────────────────
+const QUIZ_KEY   = 'hf_prefs';
+const WISHLIST_KEY = 'hf_wishlist';
+
+let quizAnswers = [null, null, null];
+let quizStep    = 0;
+
+function loadPrefs() {
+  try { return JSON.parse(localStorage.getItem(QUIZ_KEY)) || null; }
+  catch { return null; }
+}
+function savePrefs(prefs) {
+  try { localStorage.setItem(QUIZ_KEY, JSON.stringify(prefs)); } catch {}
+}
+function clearPrefs() {
+  try { localStorage.removeItem(QUIZ_KEY); } catch {}
+}
+
+function updateQuizChip() {
+  const prefs = loadPrefs();
+  if (!quizChip) return;
+  if (prefs) {
+    quizChip.classList.add('active');
+    quizChip.textContent = '🎯 Taste Profile: On';
+    quizChip.title = 'Click to update your taste profile';
+  } else {
+    quizChip.classList.remove('active');
+    quizChip.textContent = '🎯 Match My Taste';
+    quizChip.title = '';
+  }
+}
+updateQuizChip();
+
+function openQuiz() {
+  quizAnswers = [null, null, null];
+  quizStep    = 0;
+  const steps = quizOverlay.querySelectorAll('.quiz-step');
+  steps.forEach((s, i) => {
+    s.classList.toggle('active', i === 0);
+    s.querySelectorAll('.quiz-opt').forEach(b => b.classList.remove('selected'));
+  });
+  quizBar.style.width = '33%';
+  quizOverlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeQuiz() {
+  quizOverlay.hidden = true;
+  document.body.style.overflow = '';
+}
+
+function advanceQuiz(step, val) {
+  quizAnswers[step] = val;
+  // Highlight selected
+  quizOverlay.querySelectorAll(`.quiz-opt[data-step="${step}"]`).forEach(b => {
+    b.classList.toggle('selected', parseInt(b.dataset.val) === val);
+  });
+
+  setTimeout(() => {
+    const nextStep = step + 1;
+    if (nextStep < 3) {
+      quizStep = nextStep;
+      quizOverlay.querySelectorAll('.quiz-step').forEach((s, i) => {
+        s.classList.toggle('active', i === nextStep);
+      });
+      quizBar.style.width = `${Math.round((nextStep + 1) / 3 * 100)}%`;
+    } else {
+      // All done — save prefs
+      const prefs = { bitter: quizAnswers[0], dark: quizAnswers[1], flavor: quizAnswers[2] };
+      savePrefs(prefs);
+      updateQuizChip();
+      closeQuiz();
+      // Re-render results if already showing
+      const beers = window._lastTopBeers;
+      if (beers) {
+        const ranked = applyQuizRanking(beers, prefs);
+        rerenderBeers(ranked);
+        showPersonalizedBanner();
+      }
+    }
+  }, 220);
+}
+
+quizOverlay.addEventListener('click', e => {
+  const opt = e.target.closest('.quiz-opt[data-step]');
+  if (opt) { advanceQuiz(parseInt(opt.dataset.step), parseInt(opt.dataset.val)); return; }
+  if (e.target === quizOverlay) closeQuiz();
+});
+quizClose.addEventListener('click', closeQuiz);
+quizChip.addEventListener('click', openQuiz);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (!quizOverlay.hidden) { closeQuiz(); return; }
+    if (!detailOverlay.hidden) { closeDetail(); return; }
+  }
+});
+
+// ── Quiz ranking logic ────────────────────────────────────
+// Style → quiz dimension compatibility scores
+const STYLE_BITTER = {
+  'Hazy IPA': 2, 'Double IPA': 4, 'West Coast IPA': 3, 'Session IPA': 2,
+  'IPA': 3, 'Imperial Stout': 2, 'Stout': 2, 'Pale Ale': 2,
+  'Barleywine': 3, 'Sour': 0, 'Wheat': 1, 'Lager': 1, 'Amber / Red': 1,
+  'Brown Ale': 1, 'Belgian': 1, 'Cider': 0, 'Mead': 0,
+};
+const STYLE_DARK = {
+  'Imperial Stout': 2, 'Stout': 2, 'Brown Ale': 2, 'Barleywine': 2,
+  'Amber / Red': 1, 'Belgian': 1, 'Pale Ale': 1, 'IPA': 1,
+  'West Coast IPA': 1, 'Double IPA': 1, 'Hazy IPA': 1, 'Session IPA': 0,
+  'Lager': 0, 'Wheat': 0, 'Sour': 0, 'Cider': 0, 'Mead': 0,
+};
+const STYLE_FLAVOR = { // 0=fruity, 1=malty, 2=tart
+  'Hazy IPA': 0, 'West Coast IPA': 0, 'Session IPA': 0, 'Sour': 2,
+  'Belgian': 2, 'Wheat': 0, 'Double IPA': 0,
+  'IPA': 0, 'Pale Ale': 0,
+  'Brown Ale': 1, 'Amber / Red': 1, 'Barleywine': 1, 'Lager': 1,
+  'Imperial Stout': 1, 'Stout': 1, 'Cider': 0, 'Mead': 0,
+};
+
+function quizMultiplier(beer, prefs) {
+  const style = beer.style_category || '';
+  let m = 1.0;
+
+  // Bitterness: pref 0=low, 1=med, 2=high; style level 0-4
+  const bLvl = STYLE_BITTER[style] ?? 1;
+  const bPref = prefs.bitter;
+  if (bPref === 0 && bLvl <= 1) m += 0.15;
+  else if (bPref === 0 && bLvl >= 3) m -= 0.18;
+  else if (bPref === 1 && bLvl === 2) m += 0.08;
+  else if (bPref === 2 && bLvl >= 3) m += 0.15;
+  else if (bPref === 2 && bLvl <= 1) m -= 0.12;
+
+  // Darkness: pref 0=light, 1=medium, 2=dark; style 0-2
+  const dLvl = STYLE_DARK[style] ?? 1;
+  const dPref = prefs.dark;
+  if (dPref === 0 && dLvl === 0) m += 0.12;
+  else if (dPref === 0 && dLvl === 2) m -= 0.15;
+  else if (dPref === 1 && dLvl === 1) m += 0.08;
+  else if (dPref === 2 && dLvl === 2) m += 0.12;
+  else if (dPref === 2 && dLvl === 0) m -= 0.12;
+
+  // Flavor match: 0=fruity, 1=malty, 2=tart
+  const fPref = prefs.flavor;
+  const fMatch = STYLE_FLAVOR[style];
+  if (fMatch === fPref) m += 0.10;
+  else if (Math.abs((fMatch ?? 1) - fPref) === 2) m -= 0.08;
+
+  return Math.max(0.55, Math.min(1.45, m));
+}
+
+function applyQuizRanking(beers, prefs) {
+  if (!prefs) return beers;
+  return [...beers]
+    .map(b => ({ ...b, _quizScore: b.score * quizMultiplier(b, prefs) }))
+    .sort((a, b) => b._quizScore - a._quizScore);
+}
+
+function showPersonalizedBanner() {
+  const banner = document.getElementById('personalizedBanner');
+  if (banner) { banner.hidden = false; return; }
+  const b = document.createElement('div');
+  b.id = 'personalizedBanner';
+  b.className = 'personalized-banner';
+  b.innerHTML = '🎯 Results personalized to your taste profile &nbsp;<button class="pb-reset" id="pbReset">Reset</button>';
+  const inner = document.querySelector('.results-inner');
+  if (inner) inner.insertBefore(b, inner.firstChild);
+  document.getElementById('pbReset')?.addEventListener('click', () => {
+    clearPrefs();
+    updateQuizChip();
+    b.hidden = true;
+    if (window._lastTopBeers) rerenderBeers(window._lastTopBeers);
+  });
+}
+
+// ── Wishlist ──────────────────────────────────────────────
+function loadWishlist() {
+  try { return new Set(JSON.parse(localStorage.getItem(WISHLIST_KEY)) || []); }
+  catch { return new Set(); }
+}
+function saveWishlist(set) {
+  try { localStorage.setItem(WISHLIST_KEY, JSON.stringify([...set])); } catch {}
+}
+function toggleWishlist(beerId) {
+  const wl = loadWishlist();
+  if (wl.has(beerId)) wl.delete(beerId);
+  else wl.add(beerId);
+  saveWishlist(wl);
+  return wl.has(beerId);
+}
+function isWishlisted(beerId) {
+  return loadWishlist().has(beerId);
+}
 
 // ── Form submit ───────────────────────────────────────────
 form.addEventListener('submit', e => {
@@ -110,11 +307,14 @@ function renderResults(data) {
     data.mock ? tag('DEMO', true) : '',
   ].join('');
 
-  featuredWrap.innerHTML = '';
-  featuredWrap.appendChild(buildFeaturedCard(data.topBeers[0]));
+  // Store for quiz re-ranking
+  window._lastTopBeers = data.topBeers;
 
-  secGrid.innerHTML = '';
-  data.topBeers.slice(1).forEach((beer, i) => secGrid.appendChild(buildSecCard(beer, i + 2)));
+  const prefs = loadPrefs();
+  const ranked = applyQuizRanking(data.topBeers, prefs);
+
+  rerenderBeers(ranked);
+  if (prefs) showPersonalizedBanner();
 
   const evs = (data.allEvents || []).slice(0, 9);
   if (evs.length) {
@@ -128,6 +328,16 @@ function renderResults(data) {
   requestAnimationFrame(() => setTimeout(animateFills, 80));
 }
 
+function rerenderBeers(beers) {
+  featuredWrap.innerHTML = '';
+  featuredWrap.appendChild(buildFeaturedCard(beers[0]));
+
+  secGrid.innerHTML = '';
+  beers.slice(1).forEach((beer, i) => secGrid.appendChild(buildSecCard(beer, i + 2)));
+
+  requestAnimationFrame(() => setTimeout(animateFills, 80));
+}
+
 function animateFills() {
   document.querySelectorAll('.sec-bar-fill[data-pct]').forEach(el => {
     el.style.width = el.dataset.pct + '%';
@@ -136,12 +346,15 @@ function animateFills() {
     el.setAttribute('height', el.dataset.targetH);
     el.setAttribute('y', el.dataset.targetY);
   });
+  document.querySelectorAll('.detail-abv-fill[data-pct]').forEach(el => {
+    el.style.width = el.dataset.pct + '%';
+  });
 }
 
 // ── Beer detail sheet ─────────────────────────────────────
 async function openBeerDetail(beerId, beerName) {
   detailContent.innerHTML = buildDetailSkeleton(beerName);
-  detailOverlay.classList.add('open');
+  detailOverlay.hidden = false;
   document.body.style.overflow = 'hidden';
 
   try {
@@ -149,33 +362,43 @@ async function openBeerDetail(beerId, beerName) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Not found');
     detailContent.innerHTML = buildDetailHTML(data);
+    requestAnimationFrame(() => setTimeout(animateFills, 60));
   } catch (err) {
     detailContent.innerHTML = `<p class="detail-error">Couldn't load beer details: ${x(err.message)}</p>`;
   }
 }
 
 function closeDetail() {
-  detailOverlay.classList.remove('open');
-  document.body.style.overflow = '';
+  detailOverlay.classList.add('closing');
+  setTimeout(() => {
+    detailOverlay.hidden = true;
+    detailOverlay.classList.remove('closing');
+    document.body.style.overflow = '';
+  }, 150);
 }
 
 detailClose.addEventListener('click', closeDetail);
 detailOverlay.addEventListener('click', e => { if (e.target === detailOverlay) closeDetail(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
 function buildDetailSkeleton(name) {
   return `
     <div class="detail-loading">
-      <div class="detail-sk detail-sk-title">${x(name || 'Loading…')}</div>
-      <div class="detail-sk detail-sk-sub"></div>
-      <div class="detail-sk detail-sk-bar"></div>
-      <div class="detail-sk detail-sk-bar" style="width:60%"></div>
+      <div class="detail-sk">
+        <div class="detail-sk-title">${x(name || 'Loading…')}</div>
+        <div class="detail-sk-sub"></div>
+        <div class="detail-sk-bar"></div>
+        <div class="detail-sk-bar" style="width:60%"></div>
+      </div>
     </div>`;
 }
 
 function buildDetailHTML(data) {
   const { beer, brewery, events, similar } = data;
-  const pct = Math.round((beer.rating / 5) * 100);
+
+  // IBU bitterness bar (level 0-4 → 0-100%)
+  const ibuPct   = Math.round((beer.ibuLevel ?? 2) / 4 * 100);
+  const ibuLabel = beer.ibuLabel || '';
+  const ibuRange = beer.ibuRange || '';
 
   const evHTML = events.length ? `
     <div class="detail-section">
@@ -184,10 +407,13 @@ function buildDetailHTML(data) {
         ${events.map(ev => {
           const nameEl = ev.url
             ? `<a href="${x(ev.url)}" target="_blank" rel="noopener" class="dev-link">${x(ev.name)}</a>`
-            : `<span>${x(ev.name)}</span>`;
+            : `<span class="dev-link">${x(ev.name)}</span>`;
           return `<div class="detail-event-row">
-            ${ev.date ? `<div class="dev-date-badge">${fmtDateBadge(ev.date)}</div>` : ''}
-            <div class="dev-body">${nameEl}${ev.date ? `<span class="dev-time">${fmtTime(ev.date)}</span>` : ''}</div>
+            ${ev.date ? `<div class="dev-date-badge">
+              <span class="ev-day">${fmtDay(ev.date)}</span>
+              <span class="ev-month">${fmtMonth(ev.date)}</span>
+            </div>` : ''}
+            <div class="dev-body">${nameEl}${ev.date ? `<span class="dev-time">🕐 ${fmtTime(ev.date)}</span>` : ''}</div>
           </div>`;
         }).join('')}
       </div>
@@ -195,26 +421,39 @@ function buildDetailHTML(data) {
 
   const simHTML = similar.length ? `
     <div class="detail-section">
-      <div class="detail-section-label">🍺 Similar Beers</div>
+      <div class="detail-section-label">🍺 Similar Beers Nearby</div>
       <div class="detail-similar-grid">
         ${similar.map(s => `
-          <div class="dsim-card" data-beer-id="${x(s.id)}" data-beer-name="${x(s.name)}" role="button" tabindex="0">
+          <div class="dsim-card clickable-card" data-beer-id="${x(s.id)}" data-beer-name="${x(s.name)}" role="button" tabindex="0">
             <div class="dsim-name">${x(s.name)}</div>
             <div class="dsim-meta">
               <span class="style-chip" style="font-size:.52rem">${x(s.style)}</span>
-              <span class="dsim-rating">★ ${s.rating.toFixed(2)}</span>
             </div>
+            <div class="dsim-rating">★ ${s.rating.toFixed(2)}</div>
             <div class="dsim-brewery">${x(s.breweryName)}</div>
           </div>`).join('')}
       </div>
     </div>` : '';
+
+  const foodHTML = beer.foodPairing ? `
+    <div class="detail-section">
+      <div class="detail-section-label">🍽️ Pairs Well With</div>
+      <div class="detail-food-pairing">${x(beer.foodPairing)}</div>
+    </div>` : '';
+
+  const seasonHTML = beer.isSeasonal ? `
+    <span class="seasonal-badge">${x(beer.seasonEmoji || '⭐')} ${x(beer.seasonType)}</span>` : '';
+
+  const gemHTML = beer.isHiddenGem ? `
+    <span class="gem-badge">💎 Hidden Gem</span>` : '';
 
   return `
     <div class="detail-hero-section">
       <div class="detail-tags">
         <span class="style-chip">${x(beer.style)}</span>
         <span class="abv-chip">ABV ${beer.abv}%</span>
-        <span class="detail-score-badge">${Math.round(beer.rating / 5 * 100)} score</span>
+        ${ibuLabel ? `<span class="ibu-chip ibu-level-${beer.ibuLevel ?? 1}" title="${x(ibuRange)}">${x(ibuLabel)}</span>` : ''}
+        ${gemHTML}${seasonHTML}
       </div>
       <h2 class="detail-beer-name">${x(beer.name)}</h2>
       <div class="detail-rating-row">
@@ -222,19 +461,32 @@ function buildDetailHTML(data) {
         <span class="rating-val">${beer.rating.toFixed(2)}</span>
         <span class="review-ct">${beer.reviewCount.toLocaleString()} reviews</span>
       </div>
+
       <div class="detail-abv-bar-wrap">
-        <div class="detail-abv-track">
-          <div class="detail-abv-fill" style="width:${Math.min(beer.abv / 15 * 100, 100)}%"></div>
-          <div class="detail-abv-marker" style="left:${Math.min(beer.abv / 15 * 100, 100)}%">
-            <span class="detail-abv-val">${beer.abv}% ABV</span>
-          </div>
+        <div class="detail-bar-label-row">
+          <span class="detail-bar-label-txt">ABV</span>
+          <span class="detail-bar-val">${beer.abv}%</span>
         </div>
-        <div class="detail-abv-labels"><span>Light</span><span>Strong</span></div>
+        <div class="detail-abv-track">
+          <div class="detail-abv-fill" data-pct="${Math.min(beer.abv / 15 * 100, 100).toFixed(1)}" style="width:0%"></div>
+        </div>
+        <div class="detail-abv-labels"><span>0% Light</span><span>15%+ Strong</span></div>
       </div>
+
+      ${ibuLabel ? `<div class="detail-abv-bar-wrap" style="margin-top:.75rem">
+        <div class="detail-bar-label-row">
+          <span class="detail-bar-label-txt">Bitterness</span>
+          <span class="detail-bar-val">${x(ibuLabel)}${ibuRange ? ` · ${x(ibuRange)}` : ''}</span>
+        </div>
+        <div class="detail-abv-track">
+          <div class="detail-abv-fill detail-ibu-fill ibu-fill-level-${beer.ibuLevel ?? 1}" data-pct="${ibuPct}" style="width:0%"></div>
+        </div>
+        <div class="detail-abv-labels"><span>Not bitter</span><span>Very bitter</span></div>
+      </div>` : ''}
     </div>
 
     <div class="detail-section detail-brewery-section">
-      <div class="detail-section-label">🏭 Brewery</div>
+      <div class="detail-section-label">🏭 Brewery · ${driveTime(brewery.distanceMiles || 0)}</div>
       <div class="detail-brewery-row">
         <div class="detail-brewery-info">
           ${brewery.website
@@ -246,30 +498,32 @@ function buildDetailHTML(data) {
       </div>
     </div>
 
+    ${foodHTML}
     ${evHTML}
     ${simHTML}`;
 }
 
 // Delegate clicks on similar beer cards inside the detail sheet
 detailContent.addEventListener('click', e => {
-  const card = e.target.closest('[data-beer-id]');
-  if (card) openBeerDetail(card.dataset.beerId, card.dataset.beerName);
+  const card = e.target.closest('.dsim-card[data-beer-id]');
+  if (card) { detailSheet.scrollTop = 0; openBeerDetail(card.dataset.beerId, card.dataset.beerName); }
 });
 detailContent.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
-    const card = e.target.closest('[data-beer-id]');
-    if (card) openBeerDetail(card.dataset.beerId, card.dataset.beerName);
+    const card = e.target.closest('.dsim-card[data-beer-id]');
+    if (card) { detailSheet.scrollTop = 0; openBeerDetail(card.dataset.beerId, card.dataset.beerName); }
   }
 });
 
 // ── Featured card ─────────────────────────────────────────
 function buildFeaturedCard(beer) {
-  const pct = Math.round(beer.score * 100);
-  const glH = Math.round(pct * 0.5);
-  const glY = 60 - glH;
+  const pct  = Math.round(beer.score * 100);
+  const glH  = Math.round(pct * 0.5);
+  const glY  = 60 - glH;
   const bLink = beer.breweryWebsite
     ? `<a class="brewery-name-link" href="${x(beer.breweryWebsite)}" target="_blank" rel="noopener">${x(beer.breweryName)}</a>`
     : `<span class="brewery-name-link">${x(beer.breweryName)}</span>`;
+  const wl = isWishlisted(beer.id);
 
   const div = document.createElement('div');
   div.className = 'featured-card clickable-card';
@@ -286,11 +540,18 @@ function buildFeaturedCard(beer) {
       <div class="fc-rank-label">Best Match</div>
     </div>
     <div class="fc-body">
-      <div class="fc-name">${x(beer.name)}</div>
+      <div class="fc-name-row">
+        <div class="fc-name">${x(beer.name)}</div>
+        ${beer.id ? `<button class="wishlist-btn${wl ? ' active' : ''}" data-beer-id="${x(beer.id)}" aria-label="${wl ? 'Remove from wishlist' : 'Add to wishlist'}" title="${wl ? 'Saved' : 'Save beer'}">
+          ${heartSVG(wl)}
+        </button>` : ''}
+      </div>
       <div class="tags-row">
         <span class="style-chip">${x(beer.style)}</span>
         <span class="abv-chip">ABV ${beer.abv}%</span>
-        <span class="hop-chip">🌿 On Tap</span>
+        ${beer.ibuLabel ? `<span class="ibu-chip ibu-level-${beer.ibuLevel ?? 1}">${x(beer.ibuLabel)}</span>` : ''}
+        ${beer.isSeasonal ? `<span class="seasonal-badge">${x(beer.seasonEmoji)} ${x(beer.seasonType)}</span>` : ''}
+        ${beer.isHiddenGem ? '<span class="gem-badge">💎 Hidden Gem</span>' : ''}
       </div>
       <div class="rating-row">
         ${stars(beer.rating, 20)}
@@ -300,7 +561,7 @@ function buildFeaturedCard(beer) {
       <div class="brewery-row">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--muted);flex-shrink:0"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
         ${bLink}
-        <span class="dist-pill">${beer.distanceMiles} mi</span>
+        <span class="dist-pill">${beer.distanceMiles} mi · ${driveTime(beer.distanceMiles)}</span>
       </div>
       ${cardEvents(beer.events)}
       ${beer.id ? '<div class="tap-detail-hint">Tap for details →</div>' : ''}
@@ -330,12 +591,14 @@ function buildFeaturedCard(beer) {
   return div;
 }
 
-// ── Secondary card ────────────────────────────────────────
+// ── Secondary card ─────────────────────────────────────────
 function buildSecCard(beer, rank) {
-  const pct = Math.round(beer.score * 100);
+  const pct   = Math.round(beer.score * 100);
   const bLink = beer.breweryWebsite
     ? `<a class="sec-brewery" href="${x(beer.breweryWebsite)}" target="_blank" rel="noopener">${x(beer.breweryName)}</a>`
     : `<span class="sec-brewery">${x(beer.breweryName)}</span>`;
+  const rankStr = rank < 10 ? `0${rank}` : `${rank}`;
+  const wl = isWishlisted(beer.id);
 
   const div = document.createElement('div');
   div.className = 'sec-card clickable-card';
@@ -347,15 +610,21 @@ function buildSecCard(beer, rank) {
     div.title = 'Click for details';
   }
   div.innerHTML = `
-    <div class="sec-ghost-rank">0${rank}</div>
+    <div class="sec-ghost-rank">${rankStr}</div>
     <div class="sec-header">
-      <div class="sec-rank-tab">0${rank}</div>
+      <div class="sec-rank-tab">${rankStr}</div>
       <div class="sec-style-area">
-        <div class="tags-row" style="margin-bottom:0">
+        <div class="tags-row" style="margin-bottom:0;flex-wrap:wrap;gap:.3rem">
           <span class="style-chip" style="font-size:.55rem">${x(beer.style)}</span>
           <span class="abv-chip" style="font-size:.55rem">ABV ${beer.abv}%</span>
+          ${beer.ibuLabel ? `<span class="ibu-chip ibu-level-${beer.ibuLevel ?? 1}" style="font-size:.52rem">${x(beer.ibuLabel)}</span>` : ''}
+          ${beer.isSeasonal ? `<span class="seasonal-badge" style="font-size:.5rem">${x(beer.seasonEmoji)}</span>` : ''}
+          ${beer.isHiddenGem ? '<span class="gem-badge" style="font-size:.5rem">💎</span>' : ''}
         </div>
       </div>
+      ${beer.id ? `<button class="wishlist-btn wishlist-btn-sm${wl ? ' active' : ''}" data-beer-id="${x(beer.id)}" aria-label="${wl ? 'Remove from wishlist' : 'Save beer'}">
+        ${heartSVG(wl)}
+      </button>` : ''}
     </div>
     <div class="sec-body">
       <div class="sec-name">${x(beer.name)}</div>
@@ -382,18 +651,33 @@ function buildSecCard(beer, rank) {
   return div;
 }
 
-// ── Click handlers on beer cards ──────────────────────────
+// ── Wishlist button clicks (delegated) ────────────────────
 document.addEventListener('click', e => {
+  // Wishlist toggle
+  const wBtn = e.target.closest('.wishlist-btn[data-beer-id]');
+  if (wBtn) {
+    e.stopPropagation();
+    const beerId = wBtn.dataset.beerId;
+    const nowSaved = toggleWishlist(beerId);
+    // Update all wishlist buttons for this beer
+    document.querySelectorAll(`.wishlist-btn[data-beer-id="${CSS.escape(beerId)}"]`).forEach(b => {
+      b.classList.toggle('active', nowSaved);
+      b.setAttribute('aria-label', nowSaved ? 'Remove from wishlist' : 'Add to wishlist');
+      b.innerHTML = heartSVG(nowSaved);
+    });
+    return;
+  }
+
+  // Beer card click → open detail
   const card = e.target.closest('.clickable-card[data-beer-id]');
   if (!card) return;
-  // Don't intercept clicks on links inside the card
-  if (e.target.closest('a')) return;
+  if (e.target.closest('a') || e.target.closest('.wishlist-btn')) return;
   openBeerDetail(card.dataset.beerId, card.dataset.beerName);
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   const card = e.target.closest('.clickable-card[data-beer-id]');
-  if (card) openBeerDetail(card.dataset.beerId, card.dataset.beerName);
+  if (card && !e.target.closest('.wishlist-btn')) openBeerDetail(card.dataset.beerId, card.dataset.beerName);
 });
 
 // ── Event card ────────────────────────────────────────────
@@ -409,10 +693,12 @@ function buildEventCard(ev) {
   div.className = 'ev-card';
   div.innerHTML = `
     <div class="ev-top">
-      ${ev.date ? `<div class="ev-date-badge">
-        <span class="ev-day">${fmtDay(ev.date)}</span>
-        <span class="ev-month">${fmtMonth(ev.date)}</span>
-      </div>` : '<div class="ev-date-badge ev-date-tbd"><span class="ev-day">?</span><span class="ev-month">TBD</span></div>'}
+      ${ev.date
+        ? `<div class="ev-date-badge">
+            <span class="ev-day">${fmtDay(ev.date)}</span>
+            <span class="ev-month">${fmtMonth(ev.date)}</span>
+          </div>`
+        : `<div class="ev-date-badge"><span class="ev-day">?</span><span class="ev-month">TBD</span></div>`}
       <div class="ev-main">
         <span class="ev-source ${srcCls}">${srcText}</span>
         ${namePart}
@@ -464,6 +750,12 @@ function stars(rating, size = 18) {
   return html + '</div>';
 }
 
+function heartSVG(filled) {
+  return filled
+    ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="var(--amber)" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`
+    : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+}
+
 // ── Helpers ───────────────────────────────────────────────
 function tag(text, amber = false) {
   return `<span class="meta-tag${amber ? ' hit' : ''}">${text}</span>`;
@@ -474,6 +766,14 @@ function x(str) {
   return String(str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function driveTime(miles) {
+  if (!miles || miles < 0.35) return 'Walkable';
+  if (miles < 0.8) return '~' + Math.round(miles / 3 * 60) + ' min walk';
+  const mph = miles < 3 ? 15 : miles < 10 ? 22 : 35;
+  const mins = Math.max(2, Math.round(miles / mph * 60));
+  return `~${mins} min drive`;
 }
 
 function fmtDate(s) {
@@ -511,6 +811,8 @@ function hideAll() {
   errorState.hidden    = true;
   eventsSection.hidden = true;
   mockBadge.hidden     = true;
+  const banner = document.getElementById('personalizedBanner');
+  if (banner) banner.hidden = true;
 }
 
 function showError(title, msg) {

@@ -62,10 +62,14 @@ function rankBeers(beers) {
       ).toFixed(4)
     );
 
+    // Hidden gem: well-rated but not widely reviewed → likely underrated local pick
+    const isHiddenGem = beer.rating >= 4.0 && beer.reviewCount <= 80;
+
     return {
       id:             beer.id || null,
       name:           beer.name,
       style:          beer.style,
+      style_category: beer.style_category,
       abv:            beer.abv,
       rating:         beer.rating,
       reviewCount:    beer.reviewCount,
@@ -76,6 +80,15 @@ function rankBeers(beers) {
       breweryWebsite: beer.brewery.website,
       score,
       events:         beer.events,
+      // Enrichment fields passed through
+      ibuLabel:       beer.ibuLabel   || null,
+      ibuLevel:       beer.ibuLevel   ?? 1,
+      ibuRange:       beer.ibuRange   || null,
+      foodPairing:    beer.foodPairing || null,
+      isSeasonal:     beer.isSeasonal || false,
+      seasonType:     beer.seasonType || null,
+      seasonEmoji:    beer.seasonEmoji || null,
+      isHiddenGem,
     };
   });
 
