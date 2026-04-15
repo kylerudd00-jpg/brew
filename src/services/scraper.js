@@ -65,20 +65,25 @@ const NOISE_WORDS = new Set([
 /**
  * Scrape tap list from a brewery website.
  * @param {string|null} websiteUrl
+ * @param {{ signal?: AbortSignal }} [options]
  * @returns {Promise<string[]>}  beer names, max 25
  */
-async function scrapeTapList(websiteUrl) {
+async function scrapeTapList(websiteUrl, options = {}) {
   if (!websiteUrl) return [];
   const base = websiteUrl.replace(/\/$/, '');
 
   const urlsToTry = [base, ...TAP_SLUGS.map(s => `${base}${s}`)];
 
   for (const url of urlsToTry) {
+    throwIfAborted(options.signal);
     try {
-      const html  = await fetchWithRetry(url);
+      const html  = await fetchWithRetry(url, options);
       const beers = extractBeers(html);
       if (beers.length >= 2) return beers;
-    } catch { /* try next */ }
+    } catch (err) {
+      if (isAbortError(err)) throw err;
+      /* try next */
+    }
   }
   return [];
 }
@@ -88,20 +93,25 @@ async function scrapeTapList(websiteUrl) {
  * @param {string|null} websiteUrl
  * @param {string} breweryId
  * @param {string} breweryName
+ * @param {{ signal?: AbortSignal }} [options]
  * @returns {Promise<ScrapedEvent[]>}
  */
-async function scrapeEvents(websiteUrl, breweryId, breweryName) {
+async function scrapeEvents(websiteUrl, breweryId, breweryName, options = {}) {
   if (!websiteUrl) return [];
   const base = websiteUrl.replace(/\/$/, '');
 
   const urlsToTry = [base, ...EVENT_SLUGS.map(s => `${base}${s}`)];
 
   for (const url of urlsToTry) {
+    throwIfAborted(options.signal);
     try {
-      const html   = await fetchWithRetry(url);
+      const html   = await fetchWithRetry(url, options);
       const events = extractEvents(html, url, breweryId, breweryName);
       if (events.length > 0) return events;
-    } catch { /* try next */ }
+    } catch (err) {
+      if (isAbortError(err)) throw err;
+      /* try next */
+    }
   }
   return [];
 }
@@ -110,10 +120,14 @@ async function scrapeEvents(websiteUrl, breweryId, breweryName) {
 // Internal: fetch
 // ---------------------------------------------------------------------------
 
-async function fetchWithRetry(url, attempt = 0) {
+async function fetchWithRetry(url, options = {}, attempt = 0) {
+  const { signal } = options;
+  throwIfAborted(signal);
+
   try {
     const { data } = await axios.get(url, {
       timeout: SCRAPE_TIMEOUT,
+      signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; BeerIntelBot/1.0)',
         Accept: 'text/html,application/xhtml+xml',
@@ -123,10 +137,11 @@ async function fetchWithRetry(url, attempt = 0) {
     });
     return data;
   } catch (err) {
+    if (isAbortError(err)) throw err;
     if (attempt < MAX_RETRIES) {
       const backoff = 400 * Math.pow(2, attempt);
-      await sleep(backoff);
-      return fetchWithRetry(url, attempt + 1);
+      await sleep(backoff, signal);
+      return fetchWithRetry(url, options, attempt + 1);
     }
     throw err;
   }
@@ -261,8 +276,40 @@ function isValidBeerName(text) {
   return true;
 }
 
-function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
+function abortError() {
+  const err = new Error('Scrape aborted');
+  err.name = 'AbortError';
+  err.code = 'ABORT_ERR';
+  return err;
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw abortError();
+}
+
+function isAbortError(err) {
+  return err?.name === 'AbortError' || err?.code === 'ABORT_ERR' || err?.code === 'ERR_CANCELED';
+}
+
+function sleep(ms, signal) {
+  if (!signal) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+
+    function onAbort() {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+      reject(abortError());
+    }
+
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 function stableHash(str) {

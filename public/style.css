@@ -1144,3 +1144,553 @@ a.ev-name:hover { color: var(--amber-lt); }
   .results-header { flex-direction: column; align-items: flex-start; }
   .results-inner { padding: 2rem 1rem 4rem; }
 }
+
+/* ============================================================
+   Clickable cards
+   ============================================================ */
+.clickable-card {
+  cursor: pointer;
+  outline: none;
+}
+.clickable-card:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* "Tap for details" hint */
+.tap-detail-hint {
+  font-family: var(--cond);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber);
+  opacity: 0.65;
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
+/* Mobile text overflow fixes */
+.fc-beer-name,
+.sec-name,
+.ev-name,
+.brewery-name-link {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* ── Redesigned Event cards ──────────────────────────────── */
+.ev-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.ev-date-badge {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  min-height: 46px;
+  background: rgba(232,162,42,0.08);
+  border: 1px solid rgba(232,162,42,0.22);
+  border-radius: 8px;
+  padding: 0.3rem 0.25rem;
+  gap: 0;
+}
+
+.ev-day {
+  font-family: var(--cond);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--amber-lt);
+  line-height: 1;
+}
+
+.ev-month {
+  font-family: var(--cond);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amber);
+  opacity: 0.75;
+  line-height: 1.3;
+}
+
+.ev-date-tbd {
+  font-family: var(--cond);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
+  padding: 0.35rem 0.1rem;
+}
+
+.ev-main { flex: 1; min-width: 0; }
+
+.ev-brewery {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 0.2rem;
+}
+
+.ev-time-str {
+  font-size: 0.72rem;
+  color: var(--cream-dim);
+  margin-top: 0.2rem;
+}
+
+.ev-cta {
+  display: inline-block;
+  margin-top: 0.55rem;
+  font-family: var(--cond);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: rgba(232,162,42,0.08);
+  border: 1px solid rgba(232,162,42,0.22);
+  border-radius: 4px;
+  padding: 0.25rem 0.7rem;
+  transition: background 0.15s, color 0.15s;
+}
+.ev-cta:hover { background: rgba(232,162,42,0.18); color: var(--amber-lt); }
+
+.cev-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Beer Detail Overlay ─────────────────────────────────── */
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(5,4,10,0.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: overlay-in 0.22s ease both;
+}
+.detail-overlay[hidden] { display: none !important; }
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.detail-sheet {
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  width: 100%;
+  max-width: 640px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  position: relative;
+  animation: sheet-up 0.3s cubic-bezier(0.34,1.2,0.64,1) both;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* On desktop, show as centered modal */
+@media (min-width: 640px) {
+  .detail-overlay { align-items: center; }
+  .detail-sheet {
+    border-radius: var(--r-lg);
+    max-height: 85vh;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.7);
+  }
+}
+
+.detail-close {
+  position: sticky;
+  top: 0.75rem;
+  float: right;
+  margin: 0.75rem 0.75rem 0 0;
+  z-index: 10;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border-hi);
+  color: var(--cream-dim);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.detail-close:hover { background: var(--card-hi); color: var(--cream); }
+
+.detail-content {
+  padding: 0 1.5rem 2rem;
+  clear: both;
+}
+
+/* ── Detail hero section ─────────────────────────────────── */
+.detail-hero-section {
+  padding-top: 0.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.detail-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(232,162,42,0.12);
+  border: 1px solid rgba(232,162,42,0.3);
+  border-radius: 6px;
+  padding: 0.25rem 0.7rem;
+  font-family: var(--cond);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--amber-lt);
+}
+
+.detail-beer-name {
+  font-family: var(--serif);
+  font-size: clamp(1.5rem, 5vw, 2.2rem);
+  font-weight: 900;
+  color: var(--cream);
+  line-height: 1.1;
+  margin-bottom: 0.5rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* ── ABV bar ─────────────────────────────────────────────── */
+.detail-abv-bar-wrap {
+  margin: 1rem 0 0.25rem;
+}
+
+.detail-abv-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 100px;
+  position: relative;
+  overflow: visible;
+  margin-bottom: 0.35rem;
+}
+
+.detail-abv-fill {
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, var(--amber-dim), var(--amber-lt));
+  transition: width 0.8s cubic-bezier(0.34,1.2,0.64,1);
+  position: relative;
+}
+
+.detail-abv-marker {
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--amber-lt);
+  box-shadow: 0 0 8px rgba(245,201,74,0.5);
+}
+
+.detail-abv-val {
+  font-family: var(--cond);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--amber-lt);
+  position: absolute;
+  right: 0;
+  top: -1.4rem;
+}
+
+.detail-abv-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: var(--muted);
+  font-family: var(--cond);
+  letter-spacing: 0.06em;
+}
+
+/* ── Detail sections ─────────────────────────────────────── */
+.detail-section {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  margin-top: 1.25rem;
+}
+
+.detail-section-label {
+  font-family: var(--cond);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+/* ── Brewery section in detail ───────────────────────────── */
+.detail-brewery-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.detail-brewery-info { flex: 1; min-width: 0; }
+
+.detail-brewery-name-link {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.detail-brewery-name-link:hover { color: var(--amber-lt); }
+
+.detail-brewery-addr {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+  overflow-wrap: break-word;
+}
+
+.detail-visit-btn {
+  flex-shrink: 0;
+  font-family: var(--cond);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #1a0a00;
+  background: var(--amber);
+  border-radius: var(--r);
+  padding: 0.55rem 1.1rem;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.detail-visit-btn:hover { background: var(--amber-lt); }
+
+/* ── Events in detail ────────────────────────────────────── */
+.detail-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.detail-event-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.85rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+
+.dev-date-badge {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  min-height: 42px;
+  background: rgba(232,162,42,0.08);
+  border: 1px solid rgba(232,162,42,0.22);
+  border-radius: 7px;
+}
+
+.dev-body { flex: 1; min-width: 0; }
+
+.dev-link {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--cream);
+  line-height: 1.3;
+  overflow-wrap: break-word;
+  transition: color 0.15s;
+}
+.dev-link:hover { color: var(--amber-lt); }
+
+.dev-time {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+
+/* ── Similar beers grid ──────────────────────────────────── */
+.detail-similar-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.dsim-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.dsim-card:hover {
+  border-color: var(--border-hi);
+  transform: translateY(-2px);
+}
+
+.dsim-name {
+  font-family: var(--serif);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--cream);
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+.dsim-meta {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.dsim-rating {
+  font-family: var(--cond);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--amber-lt);
+}
+
+.dsim-brewery {
+  font-size: 0.68rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Detail loading / error states ──────────────────────── */
+.detail-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+
+.detail-sk {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.detail-sk-title {
+  height: 2.2rem;
+  width: 65%;
+  border-radius: 6px;
+  animation: shimmer 1.6s ease infinite;
+  background: linear-gradient(90deg, var(--card) 25%, var(--card-hi) 50%, var(--card) 75%);
+  background-size: 400% 100%;
+}
+
+.detail-sk-sub {
+  height: 1rem;
+  width: 45%;
+  border-radius: 6px;
+  animation: shimmer 1.6s ease infinite;
+  background: linear-gradient(90deg, var(--card) 25%, var(--card-hi) 50%, var(--card) 75%);
+  background-size: 400% 100%;
+}
+
+.detail-sk-bar {
+  height: 0.6rem;
+  width: 80%;
+  border-radius: 100px;
+  animation: shimmer 1.6s ease infinite;
+  background: linear-gradient(90deg, var(--card) 25%, var(--card-hi) 50%, var(--card) 75%);
+  background-size: 400% 100%;
+}
+
+.detail-error {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ── Mobile overflow global safety net ───────────────────── */
+@media (max-width: 640px) {
+  .detail-content { padding: 0 1rem 2rem; }
+  .detail-similar-grid { grid-template-columns: 1fr; }
+  .detail-brewery-row { flex-direction: column; align-items: flex-start; }
+  .detail-visit-btn { align-self: flex-start; }
+
+  /* Prevent any text from escaping card bounds */
+  .fc-beer-name,
+  .sec-name,
+  .detail-beer-name,
+  .dsim-name,
+  .ev-name,
+  .dev-link,
+  .brewery-name-link,
+  .detail-brewery-name-link {
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+  }
+
+  /* Chips/tags wrap instead of overflow */
+  .detail-tags,
+  .beer-tags,
+  .sec-chips {
+    flex-wrap: wrap;
+  }
+
+  /* Prevent secondary grid cards from overflowing */
+  .sec-card,
+  .featured-card {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  /* Events grid single column */
+  .events-grid { grid-template-columns: 1fr; }
+}

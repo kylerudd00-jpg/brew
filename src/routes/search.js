@@ -22,6 +22,7 @@ const { scrapeTapList, scrapeEvents } = require('../services/scraper');
 const { getEventbriteEvents }         = require('../services/eventbrite');
 const { simulateRatings }    = require('../services/ratings');
 const { enrichBeers }        = require('../services/enrichment');
+const { getMockResponse }    = require('../services/mock');
 const { rankBeers }          = require('../scoring/beerScorer');
 
 const router = express.Router();
@@ -31,6 +32,40 @@ const DEFAULT_RADIUS = parseFloat(process.env.SEARCH_RADIUS_MILES || '15');
 const DEFAULT_LIMIT  = 5;
 const MAX_LIMIT      = 20;
 const MAX_MILES      = 50;
+const SCRAPE_BUDGET_MS = parseInt(process.env.SCRAPE_BUDGET_MS || '1500', 10);
+
+function shouldUseMockFallback(err) {
+  const status = err.response?.status || err.status || null;
+  const code = err.code || err.cause?.code || '';
+  const message = err.message || '';
+
+  if (status && status >= 500) return true;
+  if (['EAI_AGAIN', 'ECONNABORTED', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT'].includes(code)) {
+    return true;
+  }
+
+  return /network error|getaddrinfo|socket hang up|timed out/i.test(message);
+}
+
+async function scrapeBreweryWithinBudget(brewery) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SCRAPE_BUDGET_MS);
+
+  try {
+    const [beerNames, scrapedEvents] = await Promise.all([
+      scrapeTapList(brewery.website, { signal: controller.signal }),
+      scrapeEvents(brewery.website, brewery.id, brewery.name, { signal: controller.signal }),
+    ]);
+    return { brewery, beerNames, scrapedEvents };
+  } catch (err) {
+    if (controller.signal.aborted || err.code === 'ABORT_ERR' || err.code === 'ERR_CANCELED') {
+      return { brewery, beerNames: [], scrapedEvents: [] };
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 router.get('/', async (req, res, next) => {
   const t0 = Date.now();
@@ -72,10 +107,40 @@ router.get('/', async (req, res, next) => {
     }
 
     // ── Geocode ──────────────────────────────────────────────────────────────
-    const coords = await geocodeZip(zip);
+    let coords;
+    let breweries;
 
-    // ── Find breweries ───────────────────────────────────────────────────────
-    const breweries = await getNearbyBreweries(coords, maxMiles);
+    try {
+      coords = await geocodeZip(zip);
+
+      // ── Find breweries ─────────────────────────────────────────────────────
+      breweries = await getNearbyBreweries(coords, maxMiles);
+    } catch (err) {
+      if (!process.env.GOOGLE_API_KEY && shouldUseMockFallback(err)) {
+        console.warn(`[search] Live discovery unavailable for ZIP ${zip}; serving mock results instead: ${err.message}`);
+
+        const response = getMockResponse(zip, {
+          style,
+          minRating,
+          maxMiles,
+          sortBy,
+          limit: limit_,
+          page,
+        });
+
+        cache.set(cacheKey, response);
+        db.logSearch(zip, {
+          breweryCount: response.meta.breweryCount,
+          beerCount: response.meta.beerCount,
+          durationMs: Date.now() - t0,
+        });
+
+        return res.json(response);
+      }
+
+      throw err;
+    }
+
     db.upsertBreweries(breweries);
 
     if (!breweries.length) {
@@ -87,13 +152,7 @@ router.get('/', async (req, res, next) => {
       getEventbriteEvents(coords, maxMiles),
       Promise.all(
         breweries.map(brewery =>
-          limit(async () => {
-            const [beerNames, scrapedEvents] = await Promise.all([
-              scrapeTapList(brewery.website),
-              scrapeEvents(brewery.website, brewery.id, brewery.name),
-            ]);
-            return { brewery, beerNames, scrapedEvents };
-          })
+          limit(() => scrapeBreweryWithinBudget(brewery))
         )
       ),
     ]);

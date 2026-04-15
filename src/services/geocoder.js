@@ -66,7 +66,9 @@ async function geocodeZipFree(zip, memKey) {
   try {
     const { data } = await axios.get(`${FREE_GEO_URL}/${zip}`, { timeout: 5000 });
     const place = data.places?.[0];
-    if (!place) throw new Error('ZIP not found');
+    if (!place) {
+      throw Object.assign(new Error('ZIP not found'), { status: 400 });
+    }
 
     const coords = {
       lat: parseFloat(place.latitude),
@@ -76,10 +78,22 @@ async function geocodeZipFree(zip, memKey) {
     db.saveZipCoords(zip, coords.lat, coords.lng);
     cache.set(memKey, coords, 86400 * 30);
     return coords;
-  } catch {
+  } catch (err) {
+    if (err.response?.status === 404 || err.status === 400) {
+      throw Object.assign(
+        new Error(`Could not geocode ZIP: ${zip}. Check the ZIP code and try again.`),
+        { status: 400, cause: err }
+      );
+    }
+
     throw Object.assign(
-      new Error(`Could not geocode ZIP: ${zip}. Check the ZIP code and try again.`),
-      { status: 400 }
+      new Error(`ZIP geocoding provider is unavailable right now for ${zip}.`),
+      {
+        status: 503,
+        code: err.code || err.cause?.code,
+        response: err.response,
+        cause: err,
+      }
     );
   }
 }

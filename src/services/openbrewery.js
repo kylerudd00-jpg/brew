@@ -10,7 +10,8 @@
 const axios = require('axios');
 
 const BASE_URL    = 'https://api.openbrewerydb.org/v1';
-const TIMEOUT     = 8000;
+const TIMEOUT     = parseInt(process.env.OPENBREWERY_TIMEOUT_MS || '2500', 10);
+const PER_PAGE    = 20;
 const USER_AGENT  = 'BeerIntel/1.0 (local dev)';
 
 /**
@@ -39,7 +40,7 @@ async function getNearbyBreweriesOBD(coords, radiusMiles = 15) {
   const { data } = await axios.get(`${BASE_URL}/breweries`, {
     params: {
       by_dist:  `${coords.lat},${coords.lng}`,
-      per_page: 50,
+      per_page: PER_PAGE,
     },
     headers: { 'User-Agent': USER_AGENT },
     timeout: TIMEOUT,

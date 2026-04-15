@@ -121,47 +121,92 @@ const MOCK_RATINGS = {
 };
 
 /**
- * Build a mock search response using the scorer so the scoring logic
- * is exercised even in mock mode.
+ * Build a mock search response using the same shape as the live /search route.
  *
  * @param {string} zip
+ * @param {{
+ *   style?: string|null,
+ *   minRating?: number|null,
+ *   maxMiles?: number,
+ *   sortBy?: 'score'|'rating'|'distance'|'reviews',
+ *   limit?: number,
+ *   page?: number,
+ * }} [options]
  * @returns {object} same shape as the real /search response
  */
-function getMockResponse(zip) {
+function getMockResponse(zip, options = {}) {
   const { rankBeers } = require('../scoring/beerScorer');
+  const { enrichBeers } = require('./enrichment');
+
+  const {
+    style = null,
+    minRating = null,
+    maxMiles = 15,
+    sortBy = 'score',
+    limit = 5,
+    page = 1,
+  } = options;
+
+  const offset = Math.max(0, (page - 1) * limit);
 
   const allBeers = [];
   for (const brewery of MOCK_BREWERIES) {
-    const ratings = MOCK_RATINGS[brewery.id] || [];
+    if (brewery.distanceMiles > maxMiles) continue;
+
+    const ratings = enrichBeers(
+      (MOCK_RATINGS[brewery.id] || []).map(beer => ({
+        ...beer,
+        brewery_id: brewery.id,
+      }))
+    );
     const events = MOCK_EVENTS[brewery.id] || [];
+
     for (const beer of ratings) {
+      if (style && beer.style_category !== style) continue;
+      if (minRating !== null && beer.rating < minRating) continue;
       allBeers.push({ ...beer, brewery, events });
     }
   }
 
-  const ranked = rankBeers(allBeers);
-  const topBeers = ranked.slice(0, 5);
+  const scored = rankBeers(allBeers);
+  const ranked = sortBy === 'score'
+    ? scored
+    : [...scored].sort((a, b) => {
+      if (sortBy === 'rating')   return b.rating - a.rating;
+      if (sortBy === 'distance') return a.distanceMiles - b.distanceMiles;
+      if (sortBy === 'reviews')  return b.reviewCount - a.reviewCount;
+      return 0;
+    });
+
+  const topBeers = ranked.slice(offset, offset + limit);
 
   const seenIds = new Set();
   const allEvents = [];
   for (const beer of topBeers) {
-    for (const ev of beer.events) {
+    for (const ev of beer.events || []) {
       if (!seenIds.has(ev.id)) { seenIds.add(ev.id); allEvents.push(ev); }
     }
   }
+
+  const hasFilters = style || minRating !== null || maxMiles !== 15 || limit !== 5 || sortBy !== 'score' || page > 1;
 
   return {
     zip,
     mock: true,
     topBeers,
     allEvents,
+    filters: hasFilters ? { style, minRating, maxMiles, sortBy, limit } : undefined,
     meta: {
-      breweryCount: MOCK_BREWERIES.length,
+      breweryCount: MOCK_BREWERIES.filter(brewery => brewery.distanceMiles <= maxMiles).length,
       beerCount: allBeers.length,
-      radiusMiles: 15,
+      totalBeers: ranked.length,
+      page,
+      limit,
+      totalPages: Math.ceil(ranked.length / limit),
+      radiusMiles: maxMiles,
       cachedAt: new Date().toISOString(),
       fromCache: false,
-      note: 'Running in mock mode — set GOOGLE_API_KEY in .env for real data',
+      note: 'Running in mock mode because live brewery discovery is unavailable.',
     },
   };
 }
