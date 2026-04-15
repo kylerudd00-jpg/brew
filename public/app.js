@@ -250,14 +250,14 @@ function isWishlisted(beerId) {
 // ── Form submit ───────────────────────────────────────────
 form.addEventListener('submit', e => {
   e.preventDefault();
-  const zip = zipInput.value.trim();
-  if (!/^\d{5}$/.test(zip)) {
+  const q = zipInput.value.trim();
+  if (!q) {
     searchField.classList.add('invalid');
-    showFieldError('Enter a valid 5-digit ZIP code.');
+    showFieldError('Enter a ZIP code or city name.');
     return;
   }
   clearError();
-  doSearch(zip);
+  doSearch(q);
 });
 
 zipInput.addEventListener('input', () => {
@@ -270,20 +270,20 @@ emptyBack.addEventListener('click', goHome);
 errorBack.addEventListener('click', goHome);
 
 // ── Search ────────────────────────────────────────────────
-async function doSearch(zip) {
+async function doSearch(q) {
   setLoading(true);
   hideAll();
   skeleton.hidden = false;
   hero.hidden = true;
 
   try {
-    const res  = await fetch(`/search?zip=${encodeURIComponent(zip)}`);
+    const res  = await fetch(`/search?q=${encodeURIComponent(q)}`);
     const data = await res.json();
     if (!res.ok) throw Object.assign(new Error(data.error || 'Server error'), { status: res.status });
     renderResults(data);
   } catch (err) {
     showError(
-      err.status === 400 ? 'Invalid ZIP' : 'Could not load results',
+      err.status === 400 ? 'Location not found' : 'Could not load results',
       err.message || 'Check your connection and try again.'
     );
   } finally {
@@ -297,7 +297,11 @@ function renderResults(data) {
   if (!data.topBeers?.length) { emptyState.hidden = false; return; }
 
   mockBadge.hidden = !data.mock;
-  resultsZip.textContent = data.zip;
+  // Show displayName (city/address) or fall back to raw query
+  resultsZip.textContent = data.displayName || data.zip;
+
+  // Store coords so beer detail requests can filter similar beers by distance
+  window._lastCoords = data.coords || null;
 
   metaBar.innerHTML = [
     tag(`🏭 ${data.meta.breweryCount} breweries`),
@@ -358,7 +362,12 @@ async function openBeerDetail(beerId, beerName) {
   document.body.style.overflow = 'hidden';
 
   try {
-    const res  = await fetch(`/beer/${encodeURIComponent(beerId)}`);
+    // Pass user's search coords so the server can filter similar beers by distance
+    const coords = window._lastCoords;
+    const locParam = (coords?.lat && coords?.lng)
+      ? `?lat=${coords.lat.toFixed(5)}&lng=${coords.lng.toFixed(5)}&radius=50`
+      : '';
+    const res  = await fetch(`/beer/${encodeURIComponent(beerId)}${locParam}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Not found');
     detailContent.innerHTML = buildDetailHTML(data);

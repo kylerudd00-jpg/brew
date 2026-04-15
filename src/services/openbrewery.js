@@ -10,9 +10,9 @@
 const axios = require('axios');
 
 const BASE_URL    = 'https://api.openbrewerydb.org/v1';
-const TIMEOUT     = parseInt(process.env.OPENBREWERY_TIMEOUT_MS || '2500', 10);
-const PER_PAGE    = 20;
-const USER_AGENT  = 'BeerIntel/1.0 (local dev)';
+const TIMEOUT     = parseInt(process.env.OPENBREWERY_TIMEOUT_MS || '4000', 10);
+const PER_PAGE    = 50;   // OBD max — reduce chance of missing nearby breweries
+const USER_AGENT  = 'BeerIntel/1.0 (craft beer discovery)';
 
 /**
  * Haversine distance between two lat/lng points, in miles.

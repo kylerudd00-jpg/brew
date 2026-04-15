@@ -258,13 +258,16 @@ try {
            br.website AS brewery_website, br.lat, br.lng
     FROM beers b JOIN breweries br ON b.brewery_id = br.id WHERE b.id = ?
   `);
+  // Similar beers — same style, different beer, MUST be from a known nearby brewery
+  // (brewery must have lat/lng within radiusMiles of the search coords)
   const _similarBeers = db.prepare(`
     SELECT b.*, br.name AS brewery_name, br.address AS brewery_address,
-           br.website AS brewery_website
+           br.website AS brewery_website, br.lat AS br_lat, br.lng AS br_lng
     FROM beers b JOIN breweries br ON b.brewery_id = br.id
     WHERE b.style_category = @style AND b.id != @id
       AND b.available = 1 AND b.last_seen > unixepoch() - 86400 * 14
-    ORDER BY b.rating DESC LIMIT @limit
+      AND br.lat IS NOT NULL AND br.lng IS NOT NULL
+    ORDER BY b.rating DESC LIMIT 20
   `);
 
   function upsertBeer(beer) {
@@ -289,7 +292,25 @@ try {
     return _topBeers.all({ style, minRating, limit });
   }
   function getBeer(id) { return _getBeerById.get(id) || null; }
-  function getSimilarBeers(id, style, limit = 5) { return _similarBeers.all({ id, style, limit }); }
+  function getSimilarBeers(id, style, { lat, lng, radiusMiles = 50, limit = 5 } = {}) {
+    const rows = _similarBeers.all({ id, style });
+    // Filter by distance in JS (SQLite has no haversine)
+    if (lat != null && lng != null) {
+      const R = 3958.8;
+      const filtered = rows.filter(r => {
+        if (!r.br_lat || !r.br_lng) return false;
+        const dLat = ((r.br_lat - lat) * Math.PI) / 180;
+        const dLng = ((r.br_lng - lng) * Math.PI) / 180;
+        const a = Math.sin(dLat / 2) ** 2 +
+          Math.cos((lat * Math.PI) / 180) * Math.cos((r.br_lat * Math.PI) / 180) *
+          Math.sin(dLng / 2) ** 2;
+        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return dist <= radiusMiles;
+      });
+      return filtered.slice(0, limit);
+    }
+    return rows.slice(0, limit);
+  }
 
   // ── Events ───────────────────────────────────────────────────────────────────
 

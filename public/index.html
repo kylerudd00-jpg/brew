@@ -39,20 +39,21 @@
         <span class="line-perfect"><em>Perfect</em></span>
         <span class="line-pint">Pint.</span>
       </h1>
-      <p class="hero-sub">Top-rated craft beers, live tap lists &amp; events—ranked by quality, reviews &amp; distance from any ZIP code.</p>
+      <p class="hero-sub">Top-rated craft beers, live tap lists &amp; events—ranked by quality, reviews &amp; distance. Search by ZIP code or city name.</p>
 
       <form class="search-form" id="searchForm" novalidate>
         <div class="search-field" id="searchField">
-          <span class="field-label">ZIP CODE</span>
+          <span class="field-label">LOCATION</span>
           <input
             id="zipInput"
             class="zip-input"
             type="text"
-            inputmode="numeric"
-            maxlength="5"
-            placeholder="94102"
-            autocomplete="postal-code"
-            aria-label="ZIP code"
+            inputmode="text"
+            maxlength="60"
+            placeholder="ZIP or city, e.g. Austin TX"
+            autocomplete="off"
+            aria-label="ZIP code or city name"
+            spellcheck="false"
           />
           <button class="search-btn" type="submit" id="searchBtn">
             <span class="btn-text">SEARCH</span>
