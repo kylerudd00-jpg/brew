@@ -32,42 +32,109 @@ function cleanBeerName(name) {
 }
 
 // ── Stubs — returned when SQLite is unavailable ───────────────────────────────
+// These use in-memory Maps so beer/brewery data written during a search request
+// can be read back during a detail request on the SAME lambda instance.
+// Cross-instance lookups still won't work, but the /beer/:id route has a
+// fallback that reconstructs the response from query params in that case.
+
+const _stubBeerMap     = new Map();  // id → beer row
+const _stubBreweryMap  = new Map();  // id → brewery row
+const _stubEventMap    = new Map();  // brewery_id → event[]
+const _stubZipMap      = new Map();  // zip → {lat,lng}
 
 const STUBS = {
-  db:                   null,
+  db: null,
   // ZIP
-  getZipCoords:         ()  => null,
-  saveZipCoords:        ()  => {},
+  getZipCoords:  (zip) => _stubZipMap.get(zip) || null,
+  saveZipCoords: (zip, lat, lng) => { _stubZipMap.set(zip, { lat, lng }); },
   // Breweries
-  upsertBrewery:        ()  => {},
-  upsertBreweries:      ()  => {},
-  getBrewery:           ()  => null,
+  upsertBrewery:  (b) => { if (b?.id) _stubBreweryMap.set(b.id, b); },
+  upsertBreweries:(list) => { if (Array.isArray(list)) list.forEach(b => { if (b?.id) _stubBreweryMap.set(b.id, b); }); },
+  getBrewery:     (id) => _stubBreweryMap.get(id) || null,
   getCachedBreweriesNear: () => [],
   // Beers
-  upsertBeer:           (beer) => makeBeerID(beer.brewery_id || beer.breweryId, beer.name),
-  upsertBeers:          ()  => {},
-  getBeersByBrewery:    ()  => [],
-  getTopBeers:          ()  => [],
-  getBeer:              ()  => null,
-  getSimilarBeers:      ()  => [],
+  upsertBeer: (beer) => {
+    const id = makeBeerID(beer.brewery_id || beer.breweryId, beer.name);
+    const bId = beer.brewery_id || beer.breweryId;
+    _stubBeerMap.set(id, {
+      id,
+      name:           beer.name,
+      name_clean:     cleanBeerName(beer.name),
+      style:          beer.style          || null,
+      style_category: beer.style_category || null,
+      abv:            beer.abv            || null,
+      brewery_id:     bId,
+      rating:         beer.rating         || null,
+      review_count:   beer.reviewCount    || beer.review_count || 0,
+      source:         beer.source         || 'simulated',
+      // enrichment
+      ibu_label:      beer.ibuLabel       || null,
+      ibu_level:      beer.ibuLevel       ?? null,
+      ibu_range:      beer.ibuRange       || null,
+      food_pairing:   beer.foodPairing    || null,
+      is_seasonal:    beer.isSeasonal     ? 1 : 0,
+      season_type:    beer.seasonType     || null,
+      season_emoji:   beer.seasonEmoji    || null,
+      // brewery denormalised (for getBeer joins)
+      brewery_name:    _stubBreweryMap.get(bId)?.name    || null,
+      brewery_address: _stubBreweryMap.get(bId)?.address || null,
+      brewery_website: _stubBreweryMap.get(bId)?.website || null,
+      lat:             _stubBreweryMap.get(bId)?.lat     || null,
+      lng:             _stubBreweryMap.get(bId)?.lng     || null,
+    });
+    return id;
+  },
+  upsertBeers:       (list) => { if (Array.isArray(list)) list.forEach(b => STUBS.upsertBeer(b)); },
+  getBeersByBrewery: (id) => [..._stubBeerMap.values()].filter(b => b.brewery_id === id),
+  getTopBeers:       ({ style, minRating, limit = 20 } = {}) => {
+    let rows = [..._stubBeerMap.values()];
+    if (style)     rows = rows.filter(b => b.style_category === style);
+    if (minRating) rows = rows.filter(b => b.rating >= minRating);
+    return rows.sort((a, b) => b.rating - a.rating).slice(0, limit);
+  },
+  getBeer: (id) => _stubBeerMap.get(id) || null,
+  getSimilarBeers: (id, style, { lat, lng, radiusMiles = 50, limit = 5 } = {}) => {
+    const R = 3958.8;
+    return [..._stubBeerMap.values()]
+      .filter(b => {
+        if (b.id === id || b.style_category !== style) return false;
+        if (lat == null || lng == null || !b.lat || !b.lng) return true;
+        const dLat = ((b.lat - lat) * Math.PI) / 180;
+        const dLng = ((b.lng - lng) * Math.PI) / 180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= radiusMiles;
+      })
+      .sort((a, b) => b.rating - a.rating)
+      .slice(0, limit);
+  },
   // Events
-  upsertEvent:          ()  => {},
-  upsertEvents:         ()  => {},
-  getEventsByBrewery:   ()  => [],
-  getUpcomingEvents:    ()  => [],
+  upsertEvent:  (ev) => {
+    if (!ev?.brewery_id) return;
+    const list = _stubEventMap.get(ev.brewery_id) || [];
+    if (!list.find(e => e.id === ev.id)) list.push(ev);
+    _stubEventMap.set(ev.brewery_id, list);
+  },
+  upsertEvents: (list) => { if (Array.isArray(list)) list.forEach(ev => STUBS.upsertEvent(ev)); },
+  getEventsByBrewery: (id) => (_stubEventMap.get(id) || [])
+    .filter(e => !e.date || new Date(e.date) >= new Date())
+    .sort((a, b) => (a.date||'z').localeCompare(b.date||'z'))
+    .slice(0, 10),
+  getUpcomingEvents: (limit = 20) => {
+    const all = [];
+    for (const list of _stubEventMap.values()) all.push(...list);
+    return all.filter(e => !e.date || new Date(e.date) >= new Date())
+      .sort((a, b) => (a.date||'z').localeCompare(b.date||'z'))
+      .slice(0, limit);
+  },
   // Favorites
-  saveFavorite:         ()  => {},
-  deleteFavorite:       ()  => false,
-  getFavorites:         ()  => [],
-  isFavorite:           ()  => false,
-  clearFavorites:       ()  => 0,
+  saveFavorite:   () => {},
+  deleteFavorite: () => false,
+  getFavorites:   () => [],
+  isFavorite:     () => false,
+  clearFavorites: () => 0,
   // Analytics
-  logSearch:            ()  => {},
-  getStats:             ()  => ({
-    counts: { breweries: 0, beers: 0, events: 0, searches: 0 },
-    weekly: null,
-    topZips: [],
-  }),
+  logSearch: () => {},
+  getStats:  () => ({ counts: { breweries: 0, beers: 0, events: 0, searches: 0 }, weekly: null, topZips: [] }),
 };
 
 // ── Attempt SQLite initialization ─────────────────────────────────────────────

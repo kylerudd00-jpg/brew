@@ -356,18 +356,47 @@ function animateFills() {
 }
 
 // ── Beer detail sheet ─────────────────────────────────────
-async function openBeerDetail(beerId, beerName) {
+async function openBeerDetail(beerId, beerName, beerData) {
   detailContent.innerHTML = buildDetailSkeleton(beerName);
   detailOverlay.hidden = false;
   document.body.style.overflow = 'hidden';
 
   try {
-    // Pass user's search coords so the server can filter similar beers by distance
     const coords = window._lastCoords;
-    const locParam = (coords?.lat && coords?.lng)
-      ? `?lat=${coords.lat.toFixed(5)}&lng=${coords.lng.toFixed(5)}&radius=50`
-      : '';
-    const res  = await fetch(`/beer/${encodeURIComponent(beerId)}${locParam}`);
+    const params = new URLSearchParams();
+
+    // Always send location for similar-beers filtering
+    if (coords?.lat && coords?.lng) {
+      params.set('lat', coords.lat.toFixed(5));
+      params.set('lng', coords.lng.toFixed(5));
+      params.set('radius', '50');
+    }
+
+    // Pass full beer data as fallback so the server can reconstruct the
+    // response on a cold serverless start when the DB/stub cache is empty
+    if (beerData) {
+      params.set('name',           beerData.name          || '');
+      params.set('style',          beerData.style         || '');
+      params.set('styleCategory',  beerData.style_category|| beerData.styleCategory || '');
+      params.set('abv',            beerData.abv           || '');
+      params.set('rating',         beerData.rating        || '');
+      params.set('reviewCount',    beerData.reviewCount   || '');
+      params.set('breweryId',      beerData.breweryId     || '');
+      params.set('breweryName',    beerData.breweryName   || '');
+      params.set('breweryAddress', beerData.breweryAddress|| '');
+      params.set('breweryWebsite', beerData.breweryWebsite|| '');
+      if (beerData.ibuLabel)    params.set('ibuLabel',    beerData.ibuLabel);
+      if (beerData.ibuLevel != null) params.set('ibuLevel', beerData.ibuLevel);
+      if (beerData.ibuRange)    params.set('ibuRange',    beerData.ibuRange);
+      if (beerData.foodPairing) params.set('foodPairing', beerData.foodPairing);
+      if (beerData.isSeasonal)  params.set('isSeasonal',  'true');
+      if (beerData.seasonType)  params.set('seasonType',  beerData.seasonType);
+      if (beerData.seasonEmoji) params.set('seasonEmoji', beerData.seasonEmoji);
+      if (beerData.isHiddenGem) params.set('isHiddenGem', 'true');
+    }
+
+    const qs  = params.toString();
+    const res = await fetch(`/beer/${encodeURIComponent(beerId)}${qs ? '?' + qs : ''}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Not found');
     detailContent.innerHTML = buildDetailHTML(data);
@@ -515,17 +544,25 @@ function buildDetailHTML(data) {
 // Delegate clicks on similar beer cards inside the detail sheet
 detailContent.addEventListener('click', e => {
   const card = e.target.closest('.dsim-card[data-beer-id]');
-  if (card) { detailSheet.scrollTop = 0; openBeerDetail(card.dataset.beerId, card.dataset.beerName); }
+  if (card) { detailSheet.scrollTop = 0; openBeerDetail(card.dataset.beerId, card.dataset.beerName, window._beerCache?.[card.dataset.beerId]); }
 });
 detailContent.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     const card = e.target.closest('.dsim-card[data-beer-id]');
-    if (card) { detailSheet.scrollTop = 0; openBeerDetail(card.dataset.beerId, card.dataset.beerName); }
+    if (card) { detailSheet.scrollTop = 0; openBeerDetail(card.dataset.beerId, card.dataset.beerName, window._beerCache?.[card.dataset.beerId]); }
   }
 });
 
+// ── Beer cache (fallback for cold serverless starts) ──────
+function cacheBeer(beer) {
+  if (!beer?.id) return;
+  if (!window._beerCache) window._beerCache = {};
+  window._beerCache[beer.id] = beer;
+}
+
 // ── Featured card ─────────────────────────────────────────
 function buildFeaturedCard(beer) {
+  cacheBeer(beer);
   const pct  = Math.round(beer.score * 100);
   const glH  = Math.round(pct * 0.5);
   const glY  = 60 - glH;
@@ -602,6 +639,7 @@ function buildFeaturedCard(beer) {
 
 // ── Secondary card ─────────────────────────────────────────
 function buildSecCard(beer, rank) {
+  cacheBeer(beer);
   const pct   = Math.round(beer.score * 100);
   const bLink = beer.breweryWebsite
     ? `<a class="sec-brewery" href="${x(beer.breweryWebsite)}" target="_blank" rel="noopener">${x(beer.breweryName)}</a>`
@@ -681,12 +719,13 @@ document.addEventListener('click', e => {
   const card = e.target.closest('.clickable-card[data-beer-id]');
   if (!card) return;
   if (e.target.closest('a') || e.target.closest('.wishlist-btn')) return;
-  openBeerDetail(card.dataset.beerId, card.dataset.beerName);
+  openBeerDetail(card.dataset.beerId, card.dataset.beerName, window._beerCache?.[card.dataset.beerId]);
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   const card = e.target.closest('.clickable-card[data-beer-id]');
-  if (card && !e.target.closest('.wishlist-btn')) openBeerDetail(card.dataset.beerId, card.dataset.beerName);
+  if (card && !e.target.closest('.wishlist-btn'))
+    openBeerDetail(card.dataset.beerId, card.dataset.beerName, window._beerCache?.[card.dataset.beerId]);
 });
 
 // ── Event card ────────────────────────────────────────────

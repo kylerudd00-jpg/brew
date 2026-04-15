@@ -1,21 +1,20 @@
 /**
- * GET /beer/:id[?lat=&lng=&radius=]
- *
- * Returns full detail for a single beer by its stable DB id:
- *   - beer metadata (name, style, abv, rating, reviewCount, IBU, food pairing, seasonal)
- *   - parent brewery info (name, address, website, distanceMiles if coords supplied)
- *   - upcoming events at the brewery
- *   - similar beers (same style, nearby only — filtered by lat/lng when provided)
+ * GET /beer/:id
  *
  * Optional query params:
- *   lat    {number}  user's search latitude  (for distance calc + similar filter)
- *   lng    {number}  user's search longitude
- *   radius {number}  max radius for similar beers in miles (default 50)
+ *   lat, lng, radius   — user's search location (filters similar beers to nearby)
+ *
+ * Fallback params (used when the beer isn't in the DB — e.g. cold serverless start):
+ *   name, style, styleCategory, abv, rating, reviewCount,
+ *   breweryId, breweryName, breweryAddress, breweryWebsite,
+ *   ibuLabel, ibuLevel, ibuRange, foodPairing,
+ *   isSeasonal, seasonType, seasonEmoji, isHiddenGem
  */
 
 const express = require('express');
 const db      = require('../db');
 const cache   = require('../cache');
+const { getIbuInfo, getFoodPairing, getSeasonalInfo } = require('../services/enrichment');
 
 const router = express.Router();
 
@@ -30,29 +29,63 @@ function haversine(lat1, lng1, lat2, lng2) {
 }
 
 router.get('/:id', (req, res) => {
-  const { id } = req.params;
+  const { id }  = req.params;
+  const q       = req.query;
 
-  // Optional location context from the frontend
-  const userLat    = req.query.lat    ? parseFloat(req.query.lat)    : null;
-  const userLng    = req.query.lng    ? parseFloat(req.query.lng)    : null;
-  const userRadius = req.query.radius ? parseFloat(req.query.radius) : 50;
+  const userLat    = q.lat    ? parseFloat(q.lat)    : null;
+  const userLng    = q.lng    ? parseFloat(q.lng)    : null;
+  const userRadius = q.radius ? parseFloat(q.radius) : 50;
 
-  // Include location in cache key so different search locations get different similar beers
-  const locKey  = (userLat != null && userLng != null)
+  const locKey   = (userLat != null && userLng != null)
     ? `:${userLat.toFixed(3)},${userLng.toFixed(3)}`
     : '';
   const cacheKey = `beer:${id}${locKey}`;
   const cached   = cache.get(cacheKey);
   if (cached) return res.json({ ...cached, fromCache: true });
 
-  const beer = db.getBeer(id);
+  // ── Try DB first ────────────────────────────────────────────────────────────
+  let beer = db.getBeer(id);
+
+  // ── Fallback: reconstruct from query params when DB is cold ─────────────────
+  // This handles Vercel cold starts where the in-memory stub Map is empty.
+  if (!beer && q.name) {
+    const styleCategory = q.styleCategory || q.style || 'Other';
+    const ibu      = getIbuInfo(styleCategory);
+    const pairing  = getFoodPairing(styleCategory);
+    const seasonal = getSeasonalInfo(q.name, styleCategory);
+
+    beer = {
+      id,
+      name:            q.name,
+      style:           q.style           || styleCategory,
+      style_category:  styleCategory,
+      abv:             parseFloat(q.abv) || 5.5,
+      rating:          parseFloat(q.rating)      || 0,
+      review_count:    parseInt(q.reviewCount)   || 0,
+      source:          'reconstructed',
+      ibu_label:       q.ibuLabel    || ibu.label,
+      ibu_level:       q.ibuLevel != null ? parseInt(q.ibuLevel) : ibu.level,
+      ibu_range:       q.ibuRange    || ibu.range,
+      food_pairing:    q.foodPairing || pairing,
+      is_seasonal:     q.isSeasonal === 'true' || seasonal.isSeasonal ? 1 : 0,
+      season_type:     q.seasonType  || seasonal.seasonType,
+      season_emoji:    q.seasonEmoji || seasonal.seasonEmoji,
+      brewery_id:      q.breweryId      || null,
+      brewery_name:    q.breweryName    || null,
+      brewery_address: q.breweryAddress || null,
+      brewery_website: q.breweryWebsite || null,
+      lat:             q.breweryLat ? parseFloat(q.breweryLat) : null,
+      lng:             q.breweryLng ? parseFloat(q.breweryLng) : null,
+    };
+  }
+
   if (!beer) {
     return res.status(404).json({
-      error: 'Beer not found. Run /search?zip= first to populate the database.',
+      error: 'Beer not found — try searching for a location first to populate the cache.',
     });
   }
 
-  const events  = db.getEventsByBrewery(beer.brewery_id);
+  const events  = beer.brewery_id ? db.getEventsByBrewery(beer.brewery_id) : [];
   const similar = db.getSimilarBeers(id, beer.style_category, {
     lat: userLat ?? beer.lat,
     lng: userLng ?? beer.lng,
@@ -60,40 +93,42 @@ router.get('/:id', (req, res) => {
     limit: 6,
   });
 
-  // Calculate distance to brewery if we have coordinates
   let distanceMiles = null;
   if (userLat != null && userLng != null && beer.lat && beer.lng) {
     distanceMiles = parseFloat(haversine(userLat, userLng, beer.lat, beer.lng).toFixed(2));
   }
 
+  const isHiddenGem = (beer.rating >= 4.0 && beer.review_count <= 80)
+    || q.isHiddenGem === 'true';
+
   const payload = {
     beer: {
-      id:           beer.id,
-      name:         beer.name,
-      style:        beer.style,
+      id:            beer.id,
+      name:          beer.name,
+      style:         beer.style,
       styleCategory: beer.style_category,
-      abv:          beer.abv,
-      rating:       beer.rating,
-      reviewCount:  beer.review_count,
-      source:       beer.source,
-      // Enrichment fields (stored in beer row if populated, else null)
-      ibuLabel:     beer.ibu_label    || null,
-      ibuLevel:     beer.ibu_level    ?? null,
-      ibuRange:     beer.ibu_range    || null,
-      foodPairing:  beer.food_pairing || null,
-      isSeasonal:   beer.is_seasonal  ? true : false,
-      seasonType:   beer.season_type  || null,
-      seasonEmoji:  beer.season_emoji || null,
-      isHiddenGem:  (beer.rating >= 4.0 && beer.review_count <= 80),
+      abv:           beer.abv,
+      rating:        beer.rating,
+      reviewCount:   beer.review_count,
+      source:        beer.source,
+      ibuLabel:      beer.ibu_label    || null,
+      ibuLevel:      beer.ibu_level    ?? null,
+      ibuRange:      beer.ibu_range    || null,
+      foodPairing:   beer.food_pairing || null,
+      isSeasonal:    beer.is_seasonal  ? true : false,
+      seasonType:    beer.season_type  || null,
+      seasonEmoji:   beer.season_emoji || null,
+      isHiddenGem,
     },
     brewery: {
       id:            beer.brewery_id,
-      name:          beer.brewery_name,
+      name:          beer.brewery_name    || null,
       address:       beer.brewery_address || null,
-      website:       beer.brewery_website  || null,
-      lat:           beer.lat  || null,
-      lng:           beer.lng  || null,
-      distanceMiles: distanceMiles,
+      website:       beer.brewery_website && beer.brewery_website !== '#'
+                       ? beer.brewery_website : null,
+      lat:           beer.lat || null,
+      lng:           beer.lng || null,
+      distanceMiles,
     },
     events: events.map(e => ({
       id:          e.id,
@@ -114,9 +149,13 @@ router.get('/:id', (req, res) => {
       breweryName: s.brewery_name,
       website:     s.brewery_website || null,
     })),
+    reconstructed: beer.source === 'reconstructed',
   };
 
-  cache.set(cacheKey, payload, 1800);
+  // Only cache DB-backed results; reconstructed ones are ephemeral
+  if (beer.source !== 'reconstructed') {
+    cache.set(cacheKey, payload, 1800);
+  }
   return res.json(payload);
 });
 
