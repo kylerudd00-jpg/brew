@@ -15,11 +15,13 @@ const Database = require('better-sqlite3');
 const path     = require('path');
 const fs       = require('fs');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+// On Vercel (and other serverless platforms) the project root is read-only.
+// The only writable directory is /tmp — use it when VERCEL is set.
+const DATA_DIR = process.env.VERCEL ? '/tmp' : path.join(__dirname, '..', 'data');
 const DB_PATH  = path.join(DATA_DIR, 'beer-intel.db');
 
-// Ensure data dir exists
-fs.mkdirSync(DATA_DIR, { recursive: true });
+// Ensure data dir exists (no-op for /tmp which already exists)
+if (!process.env.VERCEL) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const db = new Database(DB_PATH);
 

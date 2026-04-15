@@ -60,34 +60,38 @@ app.use((err, _req, res, _next) => {
   res.status(status).json({ error: message });
 });
 
-// ── Start ────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  const mode = process.env.GOOGLE_API_KEY ? 'LIVE (Google + Scrape)' : 'LIVE (Open Brewery DB + Scrape — no API keys needed)';
-  console.log(`\nBeer Intel API — ${mode}`);
-  console.log(`  http://localhost:${PORT}`);
-  console.log(`\nEndpoints:`);
-  console.log(`  GET  /search?zip=94102`);
-  console.log(`  GET  /search?zip=94102&style=IPA&minRating=4.0&sort=rating&limit=10&page=2`);
-  console.log(`  GET  /breweries?zip=94102`);
-  console.log(`  GET  /brewery/:id`);
-  console.log(`  GET  /brewery/:id/refresh`);
-  console.log(`  GET  /beer/:id`);
-  console.log(`  GET  /trending`);
-  console.log(`  GET  /trending?style=IPA&minRating=4.2`);
-  console.log(`  GET  /trending/styles`);
-  console.log(`  GET  /favorites/:sessionId`);
-  console.log(`  POST /favorites/:sessionId         { beerId, name, ... }`);
-  console.log(`  DEL  /favorites/:sessionId/:beerId`);
-  console.log(`  GET  /admin/stats`);
-  console.log(`  GET  /admin/analytics`);
-  console.log(`  POST /admin/cache/clear`);
-  console.log(`  POST /admin/db/vacuum`);
-  console.log(`  GET  /admin/db/beers`);
-  console.log(`  GET  /admin/db/searches`);
-  console.log('');
+// ── Start (local only — Vercel imports the app directly) ─────────────────────
+if (require.main === module) {
+  app.listen(PORT, () => {
+    const mode = process.env.GOOGLE_API_KEY ? 'LIVE (Google + Scrape)' : 'LIVE (Open Brewery DB + Scrape — no API keys needed)';
+    console.log(`\nBeer Intel API — ${mode}`);
+    console.log(`  http://localhost:${PORT}`);
+    console.log(`\nEndpoints:`);
+    console.log(`  GET  /search?zip=94102`);
+    console.log(`  GET  /search?zip=94102&style=IPA&minRating=4.0&sort=rating&limit=10&page=2`);
+    console.log(`  GET  /breweries?zip=94102`);
+    console.log(`  GET  /brewery/:id`);
+    console.log(`  GET  /brewery/:id/refresh`);
+    console.log(`  GET  /beer/:id`);
+    console.log(`  GET  /trending`);
+    console.log(`  GET  /trending?style=IPA&minRating=4.2`);
+    console.log(`  GET  /trending/styles`);
+    console.log(`  GET  /favorites/:sessionId`);
+    console.log(`  POST /favorites/:sessionId         { beerId, name, ... }`);
+    console.log(`  DEL  /favorites/:sessionId/:beerId`);
+    console.log(`  GET  /admin/stats`);
+    console.log(`  GET  /admin/analytics`);
+    console.log(`  POST /admin/cache/clear`);
+    console.log(`  POST /admin/db/vacuum`);
+    console.log(`  GET  /admin/db/beers`);
+    console.log(`  GET  /admin/db/searches`);
+    console.log('');
 
-  // Start background refresh job only when API keys are present
-  if (process.env.GOOGLE_API_KEY) {
-    refresher.start();
-  }
-});
+    if (process.env.GOOGLE_API_KEY) {
+      refresher.start();
+    }
+  });
+}
+
+// Vercel imports this module and calls the app as a handler
+module.exports = app;
