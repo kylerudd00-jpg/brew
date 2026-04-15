@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hops &amp; Finds</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍺</text></svg>" />
+</head>
+<body>
+
+<!-- ====================================================== HERO -->
+<section class="hero" id="hero">
+  <div class="particles" id="particles"></div>
+  <div class="hero-vignette"></div>
+
+  <nav class="nav">
+    <div class="nav-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="6" y="2" width="10" height="16" rx="2.5" fill="#e8a22a" opacity=".85"/>
+        <rect x="7" y="3" width="8" height="3.5" rx="1.5" fill="#f5c94a" opacity=".6"/>
+        <path d="M16 8h4a2 2 0 0 1 0 4h-4" stroke="#e8a22a" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      Hops &amp; Finds
+    </div>
+    <div class="nav-right">
+      <span class="demo-chip" id="mockBadge" hidden>DEMO MODE</span>
+    </div>
+  </nav>
+
+  <div class="hero-layout">
+    <div class="hero-left">
+      <p class="eyebrow">Local Beer Intelligence</p>
+      <h1 class="hero-h1">
+        <span class="line-find">Find Your</span>
+        <span class="line-perfect"><em>Perfect</em></span>
+        <span class="line-pint">Pint.</span>
+      </h1>
+      <p class="hero-sub">Top-rated craft beers, live tap lists &amp; events—ranked by quality, reviews &amp; distance from any ZIP code.</p>
+
+      <form class="search-form" id="searchForm" novalidate>
+        <div class="search-field" id="searchField">
+          <span class="field-label">ZIP CODE</span>
+          <input
+            id="zipInput"
+            class="zip-input"
+            type="text"
+            inputmode="numeric"
+            maxlength="5"
+            placeholder="94102"
+            autocomplete="postal-code"
+            aria-label="ZIP code"
+          />
+          <button class="search-btn" type="submit" id="searchBtn">
+            <span class="btn-text">SEARCH</span>
+            <span class="btn-spinner" hidden><span class="spinner"></span></span>
+          </button>
+        </div>
+        <p class="field-error" id="inputError" role="alert" hidden></p>
+      </form>
+
+      <div class="hero-chips">
+        <span class="hchip">🏭 Live tap lists</span>
+        <span class="hchip">⭐ AI-scored rankings</span>
+        <span class="hchip">📅 Local events</span>
+      </div>
+    </div>
+
+    <div class="hero-right" aria-hidden="true">
+      <div class="deco-wrap">
+        <div class="deco-circle"></div>
+        <div class="deco-rank-num">01</div>
+        <div class="deco-lines">
+          <div class="dline d1"></div>
+          <div class="dline d2"></div>
+          <div class="dline d3"></div>
+        </div>
+        <div class="deco-tag">TOP RATED</div>
+        <div class="deco-score-label">SCORE <span class="deco-score-val">87</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================== SKELETON -->
+<div class="results-page" id="skeletonSection" hidden>
+  <div class="results-inner">
+    <div class="rh-skeleton">
+      <div class="sk sk-title"></div>
+      <div class="sk sk-meta"></div>
+    </div>
+    <div class="fc-skeleton sk-block"></div>
+    <div class="sg-skeleton">
+      <div class="sk-block"></div>
+      <div class="sk-block"></div>
+      <div class="sk-block"></div>
+      <div class="sk-block"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== RESULTS -->
+<div class="results-page" id="resultsSection" hidden>
+  <div class="results-inner">
+
+    <header class="results-header">
+      <div class="rh-text">
+        <p class="rh-eyebrow">Top Beers Near</p>
+        <h2 class="rh-title"><span id="resultsZip" class="zip-glow"></span></h2>
+        <div class="rh-meta" id="metaBar"></div>
+      </div>
+      <button class="back-btn" id="newSearchBtn">← New search</button>
+    </header>
+
+    <!-- #1 Featured -->
+    <div id="featuredWrap"></div>
+
+    <!-- #2–5 -->
+    <div class="secondary-grid" id="secondaryGrid"></div>
+
+    <!-- Events -->
+    <section id="eventsSection" hidden>
+      <div class="events-heading">
+        <span class="events-rule"></span>
+        <span class="events-label">Upcoming Events</span>
+        <span class="events-rule"></span>
+      </div>
+      <div class="events-grid" id="eventsGrid"></div>
+    </section>
+
+  </div>
+</div>
+
+<!-- ====================================================== STATES -->
+<div class="state-screen" id="emptyState" hidden>
+  <div class="state-glyph">🍺</div>
+  <h3>No breweries nearby</h3>
+  <p>Try a bigger city's ZIP or expand the search radius in your .env.</p>
+  <button class="pill-btn" id="emptyBack">← Try another ZIP</button>
+</div>
+
+<div class="state-screen" id="errorState" hidden>
+  <div class="state-glyph">⚠️</div>
+  <h3 id="errorTitle">Oops</h3>
+  <p id="errorMsg"></p>
+  <button class="pill-btn" id="errorBack">← Try again</button>
+</div>
+
+<!-- ====================================================== FOOTER -->
+<footer class="site-footer">
+  <span class="footer-logo">Hops &amp; Finds</span>
+  <span>Powered by Google Places &amp; Eventbrite</span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
