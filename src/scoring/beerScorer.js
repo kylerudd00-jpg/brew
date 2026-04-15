@@ -38,10 +38,10 @@ const MAX_RATING = 5.0;
  * }>} beers
  * @returns {ScoredBeer[]} sorted descending by score
  */
-function rankBeers(beers) {
+function rankBeers(beers, { weatherStyles = [] } = {}) {
   if (!beers.length) return [];
 
-  const maxReviews = Math.max(...beers.map((b) => b.reviewCount), 1);
+  const maxReviews  = Math.max(...beers.map((b) => b.reviewCount), 1);
   const maxDistance = Math.max(...beers.map((b) => b.brewery.distanceMiles), 1);
 
   const scored = beers.map((beer) => {
@@ -54,11 +54,16 @@ function rankBeers(beers) {
     // Closer = higher score
     const normalizedProximity = 1 - beer.brewery.distanceMiles / maxDistance;
 
+    // Small weather bonus (up to +0.04) for styles matching current conditions
+    const weatherBonus = weatherStyles.length > 0 &&
+      weatherStyles.includes(beer.style_category || beer.style) ? 0.04 : 0;
+
     const score = parseFloat(
       (
         normalizedRating * 0.5 +
         normalizedPopularity * 0.3 +
-        normalizedProximity * 0.2
+        normalizedProximity * 0.2 +
+        weatherBonus
       ).toFixed(4)
     );
 
@@ -78,6 +83,16 @@ function rankBeers(beers) {
       breweryAddress: beer.brewery.address,
       distanceMiles:  beer.brewery.distanceMiles,
       breweryWebsite: beer.brewery.website,
+      breweryLat:     beer.brewery.lat  || null,
+      breweryLng:     beer.brewery.lng  || null,
+      // Yelp enrichment fields (present only when YELP_API_KEY is set)
+      yelpRating:     beer.brewery.yelpRating     || null,
+      yelpReviewCount: beer.brewery.yelpReviewCount || null,
+      yelpUrl:        beer.brewery.yelpUrl         || null,
+      imageUrl:       beer.brewery.imageUrl        || null,
+      priceRange:     beer.brewery.priceRange      || null,
+      isClosed:       beer.brewery.isClosed        || false,
+      hours:          beer.brewery.hours           || null,
       score,
       events:         beer.events,
       // Enrichment fields passed through
@@ -89,6 +104,8 @@ function rankBeers(beers) {
       seasonType:     beer.seasonType || null,
       seasonEmoji:    beer.seasonEmoji || null,
       isHiddenGem,
+      weatherMatch: weatherStyles.length > 0 &&
+        weatherStyles.includes(beer.style_category || beer.style),
     };
   });
 

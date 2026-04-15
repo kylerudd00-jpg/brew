@@ -45,14 +45,118 @@ const mockBadge     = document.getElementById('mockBadge');
 const newSearchBtn  = document.getElementById('newSearchBtn');
 const emptyBack     = document.getElementById('emptyBack');
 const errorBack     = document.getElementById('errorBack');
-const detailOverlay = document.getElementById('detailOverlay');
-const detailSheet   = document.getElementById('detailSheet');
-const detailContent = document.getElementById('detailContent');
-const detailClose   = document.getElementById('detailClose');
-const quizOverlay   = document.getElementById('quizOverlay');
-const quizClose     = document.getElementById('quizClose');
-const quizBar       = document.getElementById('quizBar');
-const quizChip      = document.getElementById('quizChip');
+const detailOverlay  = document.getElementById('detailOverlay');
+const detailSheet    = document.getElementById('detailSheet');
+const detailContent  = document.getElementById('detailContent');
+const detailClose    = document.getElementById('detailClose');
+const quizOverlay    = document.getElementById('quizOverlay');
+const quizClose      = document.getElementById('quizClose');
+const quizBar        = document.getElementById('quizBar');
+const quizChip       = document.getElementById('quizChip');
+const weatherBanner  = document.getElementById('weatherBanner');
+const viewToggle     = document.getElementById('viewToggle');
+const tabBeers       = document.getElementById('tabBeers');
+const tabMap         = document.getElementById('tabMap');
+const mapView        = document.getElementById('mapView');
+
+// ── Map state ─────────────────────────────────────────────
+let _leafletMap     = null;
+let _activeView     = 'beers';
+let _lastBreweries  = [];
+
+function initMap(breweries, centerCoords) {
+  _lastBreweries = breweries;
+  const el = document.getElementById('breweriesMap');
+  if (!el) return;
+
+  // Destroy existing map instance to avoid double-init
+  if (_leafletMap) { _leafletMap.remove(); _leafletMap = null; }
+
+  const map = L.map('breweriesMap', { zoomControl: true }).setView(
+    [centerCoords.lat, centerCoords.lng], 12
+  );
+  _leafletMap = map;
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 18,
+  }).addTo(map);
+
+  // User location pin
+  L.circleMarker([centerCoords.lat, centerCoords.lng], {
+    radius: 8, color: '#e8a22a', fillColor: '#f5c94a',
+    fillOpacity: 0.9, weight: 2,
+  }).addTo(map).bindPopup('<b>Your search location</b>');
+
+  // Custom amber icon for breweries
+  const brewIcon = L.divIcon({
+    className: '',
+    html: `<div class="map-pin">🍺</div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32],
+  });
+
+  breweries.forEach(b => {
+    if (!b.lat || !b.lng) return;
+    const topBeer   = b.topBeer;
+    const yelpHtml  = b.yelpRating
+      ? `<div class="map-yelp">⭐ ${b.yelpRating} Yelp · ${b.yelpReviewCount} reviews${b.priceRange ? ' · ' + b.priceRange : ''}</div>`
+      : '';
+    const hoursHtml = b.hours?.todayHours
+      ? `<div class="map-hours">${b.hours.todayHours}</div>`
+      : '';
+    const photoHtml = b.imageUrl
+      ? `<img src="${x(b.imageUrl)}" class="map-photo" alt="${x(b.name)}" loading="lazy"/>`
+      : '';
+    const beerHtml  = topBeer
+      ? `<div class="map-beer">🏆 ${x(topBeer.name)} <span class="map-beer-style">${x(topBeer.style || '')}</span></div>`
+      : '';
+    const websiteHtml = b.website
+      ? `<a href="${x(b.website)}" target="_blank" rel="noopener" class="map-link">Visit website →</a>`
+      : '';
+
+    L.marker([b.lat, b.lng], { icon: brewIcon })
+      .addTo(map)
+      .bindPopup(`
+        <div class="map-popup">
+          ${photoHtml}
+          <div class="map-popup-body">
+            <strong class="map-name">${x(b.name)}</strong>
+            <div class="map-dist">${b.distanceMiles} mi · ${driveTime(b.distanceMiles)}</div>
+            ${yelpHtml}${hoursHtml}${beerHtml}${websiteHtml}
+          </div>
+        </div>`, { maxWidth: 260 });
+  });
+
+  // Fit map to brewery bounds if we have markers
+  const pts = breweries.filter(b => b.lat && b.lng).map(b => [b.lat, b.lng]);
+  if (pts.length > 1) {
+    try { map.fitBounds(L.latLngBounds(pts).pad(0.15)); } catch {}
+  }
+}
+
+function setView(view) {
+  _activeView = view;
+  const showBeers = view === 'beers';
+  featuredWrap.hidden    = !showBeers;
+  secGrid.hidden         = !showBeers;
+  mapView.hidden         = showBeers;
+  tabBeers.classList.toggle('active', showBeers);
+  tabMap.classList.toggle('active', !showBeers);
+
+  if (!showBeers && _lastBreweries.length && window._lastCoords) {
+    // Lazy-init map on first view
+    requestAnimationFrame(() => {
+      initMap(_lastBreweries, window._lastCoords);
+    });
+  }
+}
+
+viewToggle.addEventListener('click', e => {
+  const tab = e.target.closest('.vtab[data-view]');
+  if (tab) setView(tab.dataset.view);
+});
 
 // ── Taste Quiz ────────────────────────────────────────────
 const QUIZ_KEY   = 'hf_prefs';
@@ -309,7 +413,59 @@ function renderResults(data) {
     tag(`📍 ${data.meta.radiusMiles} mi radius`),
     data.meta.fromCache ? tag('⚡ Cached', true) : '',
     data.mock ? tag('DEMO', true) : '',
-  ].join('');
+    process.env?.YELP_API_KEY ? tag('Yelp', true) : '',
+  ].filter(Boolean).join('');
+
+  // Weather banner
+  if (data.weather) {
+    const w = data.weather;
+    weatherBanner.hidden = false;
+    weatherBanner.innerHTML = `
+      <span class="wb-icon">${w.emoji}</span>
+      <span class="wb-temp">${w.tempF}°F</span>
+      <span class="wb-sep">·</span>
+      <span class="wb-label">${x(w.label)}</span>
+      <span class="wb-sep">·</span>
+      <span class="wb-mood">${x(w.mood)} beers recommended</span>
+      <span class="wb-tip">${x(w.tip)}</span>`;
+  } else {
+    weatherBanner.hidden = true;
+  }
+
+  // Build brewery list for map (attach top beer to each brewery)
+  const breweryMap = new Map();
+  const beersForMap = data.topBeers || [];
+  beersForMap.forEach(beer => {
+    if (!breweryMap.has(beer.breweryId)) {
+      breweryMap.set(beer.breweryId, {
+        id:            beer.breweryId,
+        name:          beer.breweryName,
+        address:       beer.breweryAddress,
+        website:       beer.breweryWebsite,
+        lat:           beer.breweryLat || null,
+        lng:           beer.breweryLng || null,
+        distanceMiles: beer.distanceMiles,
+        yelpRating:    beer.yelpRating    || null,
+        yelpReviewCount: beer.yelpReviewCount || null,
+        yelpUrl:       beer.yelpUrl       || null,
+        imageUrl:      beer.imageUrl      || null,
+        priceRange:    beer.priceRange    || null,
+        hours:         beer.hours         || null,
+        topBeer:       { name: beer.name, style: beer.style },
+      });
+    }
+  });
+  window._lastBreweryMap = breweryMap;
+  _lastBreweries = [...breweryMap.values()];
+
+  // Show map toggle only if we have coords
+  viewToggle.hidden = !data.coords;
+  _activeView = 'beers';
+  tabBeers.classList.add('active');
+  tabMap.classList.remove('active');
+  featuredWrap.hidden = false;
+  secGrid.hidden = false;
+  mapView.hidden = true;
 
   // Store for quiz re-ranking
   window._lastTopBeers = data.topBeers;
@@ -598,17 +754,22 @@ function buildFeaturedCard(beer) {
         ${beer.ibuLabel ? `<span class="ibu-chip ibu-level-${beer.ibuLevel ?? 1}">${x(beer.ibuLabel)}</span>` : ''}
         ${beer.isSeasonal ? `<span class="seasonal-badge">${x(beer.seasonEmoji)} ${x(beer.seasonType)}</span>` : ''}
         ${beer.isHiddenGem ? '<span class="gem-badge">💎 Hidden Gem</span>' : ''}
+        ${beer.weatherMatch ? '<span class="weather-match-badge">🌡️ Weather Pick</span>' : ''}
       </div>
       <div class="rating-row">
         ${stars(beer.rating, 20)}
         <span class="rating-val">${beer.rating.toFixed(2)}</span>
         <span class="review-ct">${beer.reviewCount.toLocaleString()} reviews</span>
+        ${beer.yelpRating ? `<span class="yelp-pill" title="Yelp rating">★ ${beer.yelpRating} <span class="yelp-label">Yelp</span></span>` : ''}
       </div>
+      ${beer.imageUrl ? `<div class="brewery-photo-wrap"><img src="${x(beer.imageUrl)}" class="brewery-photo" alt="${x(beer.breweryName)}" loading="lazy"/></div>` : ''}
       <div class="brewery-row">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--muted);flex-shrink:0"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
         ${bLink}
         <span class="dist-pill">${beer.distanceMiles} mi · ${driveTime(beer.distanceMiles)}</span>
+        ${beer.priceRange ? `<span class="price-pill">${x(beer.priceRange)}</span>` : ''}
       </div>
+      ${beer.hours?.todayHours ? `<div class="hours-row">${beer.isClosed ? '🔴' : '🟢'} ${x(beer.hours.todayHours)}</div>` : ''}
       ${cardEvents(beer.events)}
       ${beer.id ? '<div class="tap-detail-hint">Tap for details →</div>' : ''}
     </div>
@@ -667,6 +828,7 @@ function buildSecCard(beer, rank) {
           ${beer.ibuLabel ? `<span class="ibu-chip ibu-level-${beer.ibuLevel ?? 1}" style="font-size:.52rem">${x(beer.ibuLabel)}</span>` : ''}
           ${beer.isSeasonal ? `<span class="seasonal-badge" style="font-size:.5rem">${x(beer.seasonEmoji)}</span>` : ''}
           ${beer.isHiddenGem ? '<span class="gem-badge" style="font-size:.5rem">💎</span>' : ''}
+          ${beer.weatherMatch ? '<span class="weather-match-badge" style="font-size:.5rem">🌡️</span>' : ''}
         </div>
       </div>
       ${beer.id ? `<button class="wishlist-btn wishlist-btn-sm${wl ? ' active' : ''}" data-beer-id="${x(beer.id)}" aria-label="${wl ? 'Remove from wishlist' : 'Save beer'}">
@@ -679,6 +841,7 @@ function buildSecCard(beer, rank) {
         ${stars(beer.rating, 14)}
         <span class="sec-rating-val">${beer.rating.toFixed(2)}</span>
         <span class="sec-reviews">(${beer.reviewCount.toLocaleString()})</span>
+        ${beer.yelpRating ? `<span class="yelp-pill yelp-pill-sm" title="Yelp rating">★ ${beer.yelpRating}</span>` : ''}
       </div>
       <div class="sec-bar-wrap">
         <div class="sec-bar-row">
@@ -859,6 +1022,9 @@ function hideAll() {
   errorState.hidden    = true;
   eventsSection.hidden = true;
   mockBadge.hidden     = true;
+  weatherBanner.hidden = true;
+  viewToggle.hidden    = true;
+  mapView.hidden       = true;
   const banner = document.getElementById('personalizedBanner');
   if (banner) banner.hidden = true;
 }

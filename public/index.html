@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍺</text></svg>" />
 </head>
 <body>
@@ -117,11 +118,25 @@
       <button class="back-btn" id="newSearchBtn">← New search</button>
     </header>
 
+    <!-- Weather banner -->
+    <div class="weather-banner" id="weatherBanner" hidden></div>
+
+    <!-- View toggle: Beers | Map -->
+    <div class="view-toggle" id="viewToggle" hidden>
+      <button class="vtab active" id="tabBeers" data-view="beers">🍺 Beers</button>
+      <button class="vtab" id="tabMap" data-view="map">🗺️ Map</button>
+    </div>
+
     <!-- #1 Featured -->
     <div id="featuredWrap"></div>
 
     <!-- #2–5 -->
     <div class="secondary-grid" id="secondaryGrid"></div>
+
+    <!-- Map view -->
+    <div id="mapView" hidden>
+      <div id="breweriesMap" style="height:420px;border-radius:12px;overflow:hidden"></div>
+    </div>
 
     <!-- Events -->
     <section id="eventsSection" hidden>
@@ -245,6 +260,7 @@
   </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPaU=" crossorigin=""></script>
 <script src="app.js"></script>
 </body>
 </html>

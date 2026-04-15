@@ -25,6 +25,8 @@ const { simulateRatings }    = require('../services/ratings');
 const { enrichBeers }        = require('../services/enrichment');
 const { getMockResponse }    = require('../services/mock');
 const { rankBeers }          = require('../scoring/beerScorer');
+const { getWeather }         = require('../services/weather');
+const { getYelpBreweries, mergeYelpData } = require('../services/yelp');
 
 const router = express.Router();
 const limiter = pLimit(4);
@@ -155,10 +157,12 @@ router.get('/', async (req, res, next) => {
       });
     }
 
-    // ── Scrape + Eventbrite (parallel) ───────────────────────────────────────
-    const [ebEvents, breweryData] = await Promise.all([
+    // ── Scrape + Eventbrite + Weather + Yelp (all parallel) ─────────────────
+    const [ebEvents, breweryData, weatherData, yelpMap] = await Promise.all([
       getEventbriteEvents(coords, maxMiles),
       Promise.all(breweries.map(brewery => limiter(() => scrapeBreweryWithinBudget(brewery)))),
+      getWeather(coords),
+      getYelpBreweries(coords, maxMiles),
     ]);
 
     db.upsertEvents(ebEvents);
@@ -166,7 +170,9 @@ router.get('/', async (req, res, next) => {
     // ── Build beer list ───────────────────────────────────────────────────────
     const allBeers = [];
 
-    for (const { brewery, beerNames, scrapedEvents } of breweryData) {
+    for (let { brewery, beerNames, scrapedEvents } of breweryData) {
+      // Enrich brewery with Yelp data when available
+      brewery = mergeYelpData(brewery, yelpMap);
       const rawNames = beerNames.length > 0
         ? beerNames
         : [`${brewery.name} House Lager`, `${brewery.name} IPA`];
@@ -201,8 +207,9 @@ router.get('/', async (req, res, next) => {
     }
 
     // ── Sort & score ──────────────────────────────────────────────────────────
-    // Always run rankBeers on the full list first to get composite scores + enrichment fields
-    const fullyRanked = rankBeers(allBeers);
+    const fullyRanked = rankBeers(allBeers, {
+      weatherStyles: weatherData?.styles || [],
+    });
 
     let ranked;
     if (sortBy === 'score') {
@@ -245,6 +252,7 @@ router.get('/', async (req, res, next) => {
       zip:         rawQuery,
       displayName,
       coords,
+      weather:     weatherData || null,
       topBeers,
       allEvents,
       filters: hasFilters ? { style, minRating, maxMiles, sortBy, limit: limit_ } : undefined,
