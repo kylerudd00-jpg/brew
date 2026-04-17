@@ -69,6 +69,11 @@ const filterReset    = document.getElementById('filterReset');
 const loadMoreWrap   = document.getElementById('loadMoreWrap');
 const loadMoreBtn    = document.getElementById('loadMoreBtn');
 const loadMoreMeta   = document.getElementById('loadMoreMeta');
+const shareBtn       = document.getElementById('shareBtn');
+const quickSearches  = document.getElementById('quickSearches');
+const qsLabel        = document.getElementById('qsLabel');
+const qsChips        = document.getElementById('qsChips');
+const filterOpenNow  = document.getElementById('filterOpenNow');
 
 // ── Map state ─────────────────────────────────────────────
 let _leafletMap     = null;
@@ -80,6 +85,92 @@ let _lastQuery      = '';
 let _currentPage    = 1;
 let _totalPages     = 1;
 let _activeFilters  = {};
+
+// ── Service Worker registration ───────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+// ── Search history ────────────────────────────────────────
+const HISTORY_KEY = 'hf_history';
+const POPULAR_CITIES = [
+  'Austin, TX', 'Denver, CO', 'Portland, OR',
+  'San Diego, CA', 'Asheville, NC', 'Chicago, IL',
+  'Seattle, WA', 'Nashville, TN',
+];
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+  catch { return []; }
+}
+function saveHistory(q) {
+  try {
+    const h = [q, ...loadHistory().filter(s => s.toLowerCase() !== q.toLowerCase())].slice(0, 5);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+  } catch {}
+}
+
+function renderQuickSearches() {
+  const history = loadHistory();
+  const hasHistory = history.length > 0;
+  const items = hasHistory ? history : POPULAR_CITIES.slice(0, 6);
+  qsLabel.textContent = hasHistory ? 'Recent' : 'Popular';
+  qsChips.innerHTML = items.map(q =>
+    `<button class="qs-chip" data-q="${x(q)}">${x(q)}</button>`
+  ).join('');
+  // Add a clear button when history exists
+  if (hasHistory) {
+    qsChips.innerHTML += `<button class="qs-clear" id="qsClear" title="Clear history">✕</button>`;
+    document.getElementById('qsClear')?.addEventListener('click', e => {
+      e.stopPropagation();
+      localStorage.removeItem(HISTORY_KEY);
+      renderQuickSearches();
+    });
+  }
+  quickSearches.hidden = false;
+}
+
+qsChips.addEventListener('click', e => {
+  const chip = e.target.closest('.qs-chip[data-q]');
+  if (chip) {
+    zipInput.value = chip.dataset.q;
+    doSearch(chip.dataset.q);
+  }
+});
+
+renderQuickSearches();
+
+// ── Share button ──────────────────────────────────────────
+shareBtn?.addEventListener('click', async () => {
+  const url  = location.href;
+  const city = resultsZip.textContent || _lastQuery;
+  const shareData = {
+    title: `Best craft beers near ${city} — Hops & Finds`,
+    text:  `Check out the top-rated craft beers near ${city}!`,
+    url,
+  };
+  try {
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      await navigator.share(shareData);
+    } else {
+      await navigator.clipboard.writeText(url);
+      shareBtn.textContent = '✓ Copied!';
+      setTimeout(() => {
+        shareBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share`;
+      }, 2000);
+    }
+  } catch {}
+});
+
+// ── Open now toggle ───────────────────────────────────────
+let _openNowActive = false;
+filterOpenNow?.addEventListener('click', () => {
+  _openNowActive = !_openNowActive;
+  filterOpenNow.setAttribute('aria-checked', _openNowActive);
+  filterOpenNow.classList.toggle('active', _openNowActive);
+});
 
 // ── URL state (auto-search on page load from ?q=) ─────────
 (function initFromUrl() {
@@ -144,7 +235,8 @@ filterApply.addEventListener('click', () => {
   if (filterSort.value !== 'score') _activeFilters.sort  = filterSort.value;
   if (filterMinRating.value)   _activeFilters.minRating = filterMinRating.value;
   if (filterRadius.value !== '15')  _activeFilters.maxMiles = filterRadius.value;
-  filterReset.hidden = Object.keys(_activeFilters).length === 0;
+  const hasFilters = Object.keys(_activeFilters).length > 0 || _openNowActive;
+  filterReset.hidden = !hasFilters;
   _currentPage = 1;
   doSearch(_lastQuery, _activeFilters, 1);
 });
@@ -155,6 +247,9 @@ filterReset.addEventListener('click', () => {
   filterMinRating.value = '';
   filterRadius.value    = '15';
   _activeFilters = {};
+  _openNowActive = false;
+  filterOpenNow?.classList.remove('active');
+  filterOpenNow?.setAttribute('aria-checked', 'false');
   filterReset.hidden = true;
   _currentPage = 1;
   doSearch(_lastQuery, {}, 1);
@@ -494,8 +589,10 @@ async function doSearch(q, filters = {}, page = 1) {
   hideAll();
   skeleton.hidden = false;
   hero.hidden = true;
+  quickSearches.hidden = true;
 
-  // Push URL state (without triggering reload)
+  // Save to search history and push URL state
+  saveHistory(q);
   const urlParams = new URLSearchParams({ q });
   history.replaceState(null, '', `?${urlParams}`);
 
@@ -665,11 +762,18 @@ function renderResults(data) {
 }
 
 function rerenderBeers(beers) {
+  // Client-side "open now" filter — hides breweries Yelp marks as closed
+  const filtered = _openNowActive
+    ? beers.filter(b => b.isClosed === false || b.isClosed == null)
+    : beers;
+
+  const list = filtered.length ? filtered : beers; // fall back if all filtered out
+
   featuredWrap.innerHTML = '';
-  featuredWrap.appendChild(buildFeaturedCard(beers[0]));
+  featuredWrap.appendChild(buildFeaturedCard(list[0]));
 
   secGrid.innerHTML = '';
-  beers.slice(1).forEach((beer, i) => secGrid.appendChild(buildSecCard(beer, i + 2)));
+  list.slice(1).forEach((beer, i) => secGrid.appendChild(buildSecCard(beer, i + 2)));
 
   requestAnimationFrame(() => setTimeout(animateFills, 80));
 }
@@ -864,7 +968,10 @@ function buildDetailHTML(data) {
             : `<span class="detail-brewery-name-link">${x(brewery.name)}</span>`}
           ${brewery.address ? `<span class="detail-brewery-addr">${x(brewery.address)}</span>` : ''}
         </div>
-        ${brewery.website ? `<a href="${x(brewery.website)}" target="_blank" rel="noopener" class="detail-visit-btn">Visit →</a>` : ''}
+        <div class="detail-brewery-btns">
+          ${brewery.website ? `<a href="${x(brewery.website)}" target="_blank" rel="noopener" class="detail-visit-btn">Visit →</a>` : ''}
+          ${brewery.address ? `<a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(brewery.address)}" target="_blank" rel="noopener" class="detail-directions-btn">📍 Directions</a>` : ''}
+        </div>
       </div>
     </div>
 
@@ -944,6 +1051,7 @@ function buildFeaturedCard(beer) {
         ${bLink}
         <span class="dist-pill">${beer.distanceMiles} mi · ${driveTime(beer.distanceMiles)}</span>
         ${beer.priceRange ? `<span class="price-pill">${x(beer.priceRange)}</span>` : ''}
+        ${beer.breweryAddress ? `<a class="directions-link" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(beer.breweryAddress)}" target="_blank" rel="noopener" title="Get directions">📍 Directions</a>` : ''}
       </div>
       ${beer.hours?.todayHours ? `<div class="hours-row">${beer.isClosed ? '🔴' : '🟢'} ${x(beer.hours.todayHours)}</div>` : ''}
       ${cardEvents(beer.events)}
@@ -1227,5 +1335,7 @@ function goHome() {
   hideAll();
   skeleton.hidden = true;
   hero.hidden     = false;
+  history.replaceState(null, '', '/');
+  renderQuickSearches();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }

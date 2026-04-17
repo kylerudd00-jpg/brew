@@ -2382,3 +2382,159 @@ a.ev-name:hover { color: var(--amber-lt); }
   font-size: 0.75rem;
   color: var(--muted);
 }
+
+/* ============================================================
+   Quick searches (recent / popular cities)
+   ============================================================ */
+.quick-searches {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  margin-top: 0.8rem;
+}
+.qs-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.qs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+.qs-chip {
+  padding: 4px 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--cream-dim);
+  font-size: 0.75rem;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.qs-chip:hover {
+  background: var(--card-hi);
+  color: var(--cream);
+  border-color: var(--amber-dim);
+}
+.qs-clear {
+  padding: 3px 8px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+.qs-clear:hover { color: var(--cream-dim); }
+
+/* ============================================================
+   Share button (results header)
+   ============================================================ */
+.rh-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.4rem 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--cream-dim);
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.share-btn:hover {
+  background: var(--card-hi);
+  color: var(--cream);
+  border-color: var(--border-hi);
+}
+
+/* ============================================================
+   Open now toggle button
+   ============================================================ */
+.filter-group-toggle { min-width: auto; }
+.open-now-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.38rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--cream-dim);
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.open-now-btn .on-label { display: none; }
+.open-now-btn .off-label { display: inline; }
+.open-now-btn.active {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #4ade80;
+}
+.open-now-btn.active .on-label  { display: inline; }
+.open-now-btn.active .off-label { display: none; }
+
+/* ============================================================
+   Get Directions link on cards
+   ============================================================ */
+.directions-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--amber-lt);
+  opacity: 0.75;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.directions-link:hover { opacity: 1; }
+
+/* ============================================================
+   Detail sheet — directions button
+   ============================================================ */
+.detail-brewery-btns {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+.detail-directions-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.35rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--cream-dim);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+  text-decoration: none;
+}
+.detail-directions-btn:hover {
+  background: var(--card-hi);
+  color: var(--cream);
+}

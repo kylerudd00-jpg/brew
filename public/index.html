@@ -10,6 +10,11 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍺</text></svg>" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#e8a22a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Hops &amp; Finds" />
 </head>
 <body>
 
@@ -68,6 +73,12 @@
         </button>
       </form>
 
+      <!-- Recent searches / popular cities -->
+      <div class="quick-searches" id="quickSearches" hidden>
+        <span class="qs-label" id="qsLabel">Recent</span>
+        <div class="qs-chips" id="qsChips"></div>
+      </div>
+
       <div class="hero-chips">
         <span class="hchip">🏭 Live tap lists</span>
         <span class="hchip">⭐ AI-scored rankings</span>
@@ -119,7 +130,13 @@
         <h2 class="rh-title"><span id="resultsZip" class="zip-glow"></span></h2>
         <div class="rh-meta" id="metaBar"></div>
       </div>
-      <button class="back-btn" id="newSearchBtn">← New search</button>
+      <div class="rh-actions">
+        <button class="share-btn" id="shareBtn" title="Share results" aria-label="Share results">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Share
+        </button>
+        <button class="back-btn" id="newSearchBtn">← New search</button>
+      </div>
     </header>
 
     <!-- Weather banner -->
@@ -180,6 +197,13 @@
             <option value="25">25 mi</option>
             <option value="50">50 mi</option>
           </select>
+        </div>
+        <div class="filter-group filter-group-toggle">
+          <label class="filter-label">Open now</label>
+          <button class="open-now-btn" id="filterOpenNow" role="switch" aria-checked="false">
+            <span class="on-label">🟢 On</span>
+            <span class="off-label">Off</span>
+          </button>
         </div>
         <button class="filter-apply-btn" id="filterApply">Apply</button>
         <button class="filter-reset-btn" id="filterReset" hidden>✕ Reset</button>

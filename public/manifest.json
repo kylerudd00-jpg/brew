@@ -1,0 +1,33 @@
+{
+  "name": "Hops & Finds",
+  "short_name": "Hops & Finds",
+  "description": "Top-rated craft beers, live tap lists & events near you — ranked by quality, reviews & distance.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#09080f",
+  "theme_color": "#e8a22a",
+  "categories": ["food", "lifestyle", "navigation"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='36' fill='%2309080f'/><rect x='56' y='20' width='72' height='120' rx='18' fill='%23e8a22a' opacity='.85'/><rect x='62' y='26' width='56' height='28' rx='12' fill='%23f5c94a' opacity='.6'/><path d='M128 66h28a14 14 0 0 1 0 28h-28' stroke='%23e8a22a' stroke-width='10' stroke-linecap='round' fill='none'/><rect x='56' y='148' width='72' height='18' rx='9' fill='%23e8a22a' opacity='.4'/></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='96' fill='%2309080f'/><rect x='148' y='52' width='192' height='320' rx='48' fill='%23e8a22a' opacity='.85'/><rect x='164' y='68' width='148' height='76' rx='32' fill='%23f5c94a' opacity='.6'/><path d='M340 176h76a38 38 0 0 1 0 76h-76' stroke='%23e8a22a' stroke-width='28' stroke-linecap='round' fill='none'/><rect x='148' y='392' width='192' height='48' rx='24' fill='%23e8a22a' opacity='.4'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Search near me",
+      "url": "/?geo=1",
+      "description": "Find craft beers near your current location"
+    }
+  ]
+}
