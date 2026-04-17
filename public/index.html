@@ -59,6 +59,9 @@
             placeholder="ZIP or city, e.g. Austin TX"
             autocomplete="off"
             aria-label="ZIP code or city name"
+            aria-autocomplete="list"
+            aria-controls="acDropdown"
+            aria-haspopup="listbox"
             spellcheck="false"
           />
           <button class="search-btn" type="submit" id="searchBtn">
@@ -67,6 +70,8 @@
           </button>
         </div>
         <p class="field-error" id="inputError" role="alert" hidden></p>
+        <!-- Autocomplete dropdown -->
+        <ul class="ac-dropdown" id="acDropdown" role="listbox" aria-label="City suggestions" hidden></ul>
         <button class="geo-btn" id="geoBtn" type="button" aria-label="Use my current location">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z" opacity=".3"/></svg>
           Use my location
@@ -355,6 +360,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPaU=" crossorigin=""></script>
+<script src="cities.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

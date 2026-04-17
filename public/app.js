@@ -58,6 +58,7 @@ const viewToggle     = document.getElementById('viewToggle');
 const tabBeers       = document.getElementById('tabBeers');
 const tabMap         = document.getElementById('tabMap');
 const mapView        = document.getElementById('mapView');
+const acDropdown     = document.getElementById('acDropdown');
 const geoBtn         = document.getElementById('geoBtn');
 const filterBar      = document.getElementById('filterBar');
 const filterStyle    = document.getElementById('filterStyle');
@@ -85,6 +86,127 @@ let _lastQuery      = '';
 let _currentPage    = 1;
 let _totalPages     = 1;
 let _activeFilters  = {};
+
+// ── City Autocomplete ─────────────────────────────────────
+let acIndex = -1; // keyboard-highlighted index
+
+function acSearch(q) {
+  if (!window.CITY_DATA || q.length < 1) return [];
+  const lower = q.toLowerCase().trim();
+  const results = [];
+
+  for (const [city, state, pop] of window.CITY_DATA) {
+    const cityL  = city.toLowerCase();
+    const stateL = state.toLowerCase();
+    const full   = `${cityL}, ${stateL}`;
+
+    // Tier 1: city name starts with query
+    if (cityL.startsWith(lower)) {
+      results.push({ city, state, pop, tier: 1 });
+      continue;
+    }
+    // Tier 2: full "city, st" starts with query
+    if (full.startsWith(lower)) {
+      results.push({ city, state, pop, tier: 2 });
+      continue;
+    }
+    // Tier 3: any word in the city name starts with query
+    if (lower.length >= 2 && cityL.split(' ').some(w => w.startsWith(lower))) {
+      results.push({ city, state, pop, tier: 3 });
+    }
+  }
+
+  // Sort: tier first, then population descending within each tier
+  results.sort((a, b) => a.tier !== b.tier ? a.tier - b.tier : b.pop - a.pop);
+  return results.slice(0, 7);
+}
+
+function acHighlight(str, query) {
+  // Bold the matched portion
+  const idx = str.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return x(str);
+  return x(str.slice(0, idx)) +
+    `<mark class="ac-match">${x(str.slice(idx, idx + query.length))}</mark>` +
+    x(str.slice(idx + query.length));
+}
+
+function acRender(matches, query) {
+  if (!matches.length) { acClose(); return; }
+  acIndex = -1;
+  acDropdown.innerHTML = matches.map((m, i) =>
+    `<li class="ac-item" role="option" data-val="${x(m.city + ', ' + m.state)}" data-idx="${i}">
+      <span class="ac-city">${acHighlight(m.city, query)}</span>
+      <span class="ac-state">${x(m.state)}</span>
+      <span class="ac-pop">${fmtPop(m.pop)}</span>
+    </li>`
+  ).join('');
+  acDropdown.hidden = false;
+}
+
+function acClose() {
+  acDropdown.hidden = true;
+  acIndex = -1;
+}
+
+function acSelect(val) {
+  zipInput.value = val;
+  acClose();
+  clearError();
+  doSearch(val);
+}
+
+function fmtPop(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return Math.round(n / 1e3) + 'K';
+  return n;
+}
+
+// Input → show suggestions
+zipInput.addEventListener('input', () => {
+  searchField.classList.remove('invalid');
+  clearError();
+  const q = zipInput.value.trim();
+  // Don't suggest for pure ZIP codes
+  if (!q || /^\d+$/.test(q)) { acClose(); return; }
+  acRender(acSearch(q), q);
+});
+
+// Keyboard navigation
+zipInput.addEventListener('keydown', e => {
+  if (acDropdown.hidden) return;
+  const items = acDropdown.querySelectorAll('.ac-item');
+  if (!items.length) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acIndex = (acIndex + 1) % items.length;
+    items.forEach((el, i) => el.classList.toggle('ac-active', i === acIndex));
+    zipInput.value = items[acIndex].dataset.val;
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acIndex = (acIndex - 1 + items.length) % items.length;
+    items.forEach((el, i) => el.classList.toggle('ac-active', i === acIndex));
+    zipInput.value = items[acIndex].dataset.val;
+  } else if (e.key === 'Escape') {
+    acClose();
+  } else if (e.key === 'Enter') {
+    if (acIndex >= 0 && items[acIndex]) {
+      e.preventDefault();
+      acSelect(items[acIndex].dataset.val);
+    }
+    // else fall through to form submit
+  }
+});
+
+// Click a suggestion
+acDropdown.addEventListener('mousedown', e => {
+  // mousedown fires before blur — use it to prevent blur from closing first
+  const item = e.target.closest('.ac-item[data-val]');
+  if (item) { e.preventDefault(); acSelect(item.dataset.val); }
+});
+
+// Close when focus leaves the input (but not on mousedown inside dropdown)
+zipInput.addEventListener('blur', () => setTimeout(acClose, 150));
 
 // ── Service Worker registration ───────────────────────────
 if ('serviceWorker' in navigator) {
