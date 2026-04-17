@@ -27,6 +27,8 @@ const { getMockResponse }    = require('../services/mock');
 const { rankBeers }          = require('../scoring/beerScorer');
 const { getWeather }         = require('../services/weather');
 const { getYelpBreweries, mergeYelpData } = require('../services/yelp');
+const { getTicketmasterEvents }           = require('../services/ticketmaster');
+const { getFoursquareBreweries, mergeFoursquareData } = require('../services/foursquare');
 
 const router = express.Router();
 const limiter = pLimit(4);
@@ -157,22 +159,26 @@ router.get('/', async (req, res, next) => {
       });
     }
 
-    // ── Scrape + Eventbrite + Weather + Yelp (all parallel) ─────────────────
-    const [ebEvents, breweryData, weatherData, yelpMap] = await Promise.all([
+    // ── Scrape + Events + Weather + Yelp + Ticketmaster + Foursquare (all parallel) ────
+    const [ebEvents, breweryData, weatherData, yelpMap, tmEvents, fsqMap] = await Promise.all([
       getEventbriteEvents(coords, maxMiles),
       Promise.all(breweries.map(brewery => limiter(() => scrapeBreweryWithinBudget(brewery)))),
       getWeather(coords),
       getYelpBreweries(coords, maxMiles),
+      getTicketmasterEvents(coords, maxMiles),
+      getFoursquareBreweries(coords, maxMiles),
     ]);
 
     db.upsertEvents(ebEvents);
+    db.upsertEvents(tmEvents);
 
     // ── Build beer list ───────────────────────────────────────────────────────
     const allBeers = [];
 
     for (let { brewery, beerNames, scrapedEvents } of breweryData) {
-      // Enrich brewery with Yelp data when available
+      // Enrich brewery with Yelp and Foursquare data when available
       brewery = mergeYelpData(brewery, yelpMap);
+      brewery = mergeFoursquareData(brewery, fsqMap);
       const rawNames = beerNames.length > 0
         ? beerNames
         : [`${brewery.name} House Lager`, `${brewery.name} IPA`];
@@ -187,12 +193,12 @@ router.get('/', async (req, res, next) => {
 
       // Match Eventbrite events to this brewery using full name similarity (not just first word)
       const brewName = brewery.name.toLowerCase();
+      const eventsForBrewery = [...ebEvents, ...tmEvents];
       const breweryEvents = [
         ...scrapedEvents,
-        ...ebEvents.filter(e => {
+        ...eventsForBrewery.filter(e => {
           if (!e.venueName) return false;
           const vName = e.venueName.toLowerCase();
-          // Match if venue name contains most of the brewery name words
           const words = brewName.split(/\s+/).filter(w => w.length > 3);
           return words.length > 0 && words.some(w => vName.includes(w));
         }),
@@ -236,7 +242,7 @@ router.get('/', async (req, res, next) => {
         if (!seenIds.has(ev.id)) { seenIds.add(ev.id); allEvents.push(ev); }
       }
     }
-    for (const ev of ebEvents) {
+    for (const ev of [...ebEvents, ...tmEvents]) {
       if (!seenIds.has(ev.id)) { seenIds.add(ev.id); allEvents.push(ev); }
     }
     // Sort events by date ascending (null dates go to end)

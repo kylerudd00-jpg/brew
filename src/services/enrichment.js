@@ -223,6 +223,51 @@ function getSeasonalInfo(name, styleCategory) {
 /** All canonical style categories (for /styles endpoint). */
 const ALL_STYLE_CATEGORIES = STYLE_MAP.map(([cat]) => cat);
 
+/**
+ * Short style descriptions shown in the beer detail view.
+ * Written for craft beer newcomers — clear, evocative, jargon-light.
+ */
+const STYLE_DESCRIPTIONS = {
+  'Hazy IPA':
+    'Soft, pillowy, and packed with tropical fruit aromas — think mango, pineapple, and passionfruit. Lower bitterness than a classic IPA with a lush, juicy mouthfeel. The style that sparked the New England craft beer revolution.',
+  'Double IPA':
+    'Everything turned up to eleven: bigger malt backbone, double the hops, double the ABV. Expect an intense wave of citrus, pine, and resin with serious warming heat. Sip slowly — this one sneaks up on you.',
+  'West Coast IPA':
+    'The original craft IPA. Crystal-clear, dry, and aggressively bitter with aromas of grapefruit, pine, and dank resin. Built for hop heads who want their bitterness front and center.',
+  'Session IPA':
+    'All the hop character of a classic IPA squeezed into a crushable low-ABV package. Great for a long afternoon at the taproom without losing track of the day.',
+  'IPA':
+    'The backbone of the craft beer movement. Expect pronounced hop bitterness and aroma — citrus, floral, herbal, or resinous depending on the brewer\'s hop selection. Endlessly versatile.',
+  'Imperial Stout':
+    'Dark as midnight and rich as dessert. Roasted coffee, dark chocolate, dried fruit, and molasses — often with warming alcohol heat. Many are aged in bourbon or whisky barrels for added complexity.',
+  'Stout':
+    'Roasted barley gives this dark ale its signature dry, coffee-like character. Porters lean milkier and chocolate-forward; classic stouts are drier and more bitter. Incredibly food-friendly.',
+  'Sour':
+    'Deliberately tart, funky, and refreshing. Produced through wild fermentation or souring bacteria like Lactobacillus. Flavors range from bright lemon and yogurt to earthy barnyard funk. A palate-cleanser unlike any other.',
+  'Wheat':
+    'Brewed with a large proportion of wheat, giving a hazy, soft pour and gentle sweetness. German hefeweizens add banana and clove from yeast; Belgian wits add orange peel and coriander. Effortlessly drinkable.',
+  'Pale Ale':
+    'The approachable gateway to hop-forward craft beer. Balanced malt sweetness with moderate hop bitterness — usually floral, citrusy, or earthy. A dependable companion to almost any food.',
+  'Lager':
+    'Fermented cold and slow for a clean, crisp finish. The world\'s most popular beer style — but craft lagers are worlds apart from mass-market versions. Look for nuanced malt character and delicate noble hop aroma.',
+  'Amber / Red':
+    'Caramel malt sweetness takes the spotlight in this copper-to-red ale. Expect toffee, biscuit, and toasted bread balanced by medium hop bitterness. Approachable and crowd-pleasing.',
+  'Brown Ale':
+    'Nutty, toasty, and warmly comforting. English-style browns are drier with hazelnut notes; American versions add more hops and sweeter chocolate malt. Perfect with pub food.',
+  'Barleywine':
+    'One of the strongest ales in existence — more wine-like in complexity and alcohol than a typical beer. Massive caramel and toffee sweetness, dried fruit, and warming heat. Best savored like a fine port.',
+  'Belgian':
+    'Yeast is the star here. Belgian strains produce distinctive fruity esters and spicy phenols — think pear, plum, and pepper — at almost any ABV. Saisons are dry and rustic; tripels are golden and strong; dubbels are rich and dark.',
+  'Cider':
+    'Fermented apple juice — not technically beer but a fixture at most taprooms. Ranges from bone-dry and effervescent to semi-sweet and still. Naturally gluten-free and endlessly variable by apple variety.',
+  'Mead':
+    'The world\'s oldest fermented beverage — honey, water, and yeast. Flavor follows the honey: wildflower meads are floral and complex; traditional meads are rich and warming. Often made with fruit, spice, or hops.',
+};
+
+function getStyleDescription(styleCategory) {
+  return STYLE_DESCRIPTIONS[styleCategory] || null;
+}
+
 module.exports = {
   normalizeStyle,
   cleanBeerName,
@@ -233,5 +278,7 @@ module.exports = {
   getIbuInfo,
   getFoodPairing,
   getSeasonalInfo,
+  getStyleDescription,
   ALL_STYLE_CATEGORIES,
+  STYLE_DESCRIPTIONS,
 };

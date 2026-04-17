@@ -58,12 +58,18 @@ function rankBeers(beers, { weatherStyles = [] } = {}) {
     const weatherBonus = weatherStyles.length > 0 &&
       weatherStyles.includes(beer.style_category || beer.style) ? 0.04 : 0;
 
+    // Small Foursquare popularity bonus (up to +0.03) — high foot traffic signal
+    const fsqBonus = beer.brewery.fsqPopularity
+      ? parseFloat((beer.brewery.fsqPopularity * 0.03).toFixed(4))
+      : 0;
+
     const score = parseFloat(
       (
         normalizedRating * 0.5 +
         normalizedPopularity * 0.3 +
         normalizedProximity * 0.2 +
-        weatherBonus
+        weatherBonus +
+        fsqBonus
       ).toFixed(4)
     );
 
@@ -93,6 +99,13 @@ function rankBeers(beers, { weatherStyles = [] } = {}) {
       priceRange:     beer.brewery.priceRange      || null,
       isClosed:       beer.brewery.isClosed        || false,
       hours:          beer.brewery.hours           || null,
+      // Foursquare enrichment fields
+      fsqCheckins:    beer.brewery.fsqCheckins     ?? null,
+      fsqPopularity:  beer.brewery.fsqPopularity   ?? null,
+      fsqPhoto:       beer.brewery.fsqPhoto        || null,
+      // Brewery metadata
+      breweryType:    beer.brewery.brewery_type    || beer.brewery.breweryType || null,
+      breweryPhone:   beer.brewery.phone           || null,
       score,
       events:         beer.events,
       // Enrichment fields passed through

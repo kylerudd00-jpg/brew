@@ -14,7 +14,7 @@
 const express = require('express');
 const db      = require('../db');
 const cache   = require('../cache');
-const { getIbuInfo, getFoodPairing, getSeasonalInfo } = require('../services/enrichment');
+const { getIbuInfo, getFoodPairing, getSeasonalInfo, getStyleDescription } = require('../services/enrichment');
 
 const router = express.Router();
 
@@ -115,10 +115,11 @@ router.get('/:id', (req, res) => {
       ibuLevel:      beer.ibu_level    ?? null,
       ibuRange:      beer.ibu_range    || null,
       foodPairing:   beer.food_pairing || null,
-      isSeasonal:    beer.is_seasonal  ? true : false,
-      seasonType:    beer.season_type  || null,
-      seasonEmoji:   beer.season_emoji || null,
+      isSeasonal:       beer.is_seasonal  ? true : false,
+      seasonType:       beer.season_type  || null,
+      seasonEmoji:      beer.season_emoji || null,
       isHiddenGem,
+      styleDescription: getStyleDescription(beer.style_category) || null,
     },
     brewery: {
       id:            beer.brewery_id,

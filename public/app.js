@@ -299,6 +299,9 @@ function initMap(breweries, centerCoords) {
     const yelpHtml  = b.yelpRating
       ? `<div class="map-yelp">⭐ ${b.yelpRating} Yelp · ${b.yelpReviewCount} reviews${b.priceRange ? ' · ' + b.priceRange : ''}</div>`
       : '';
+    const fsqHtml   = b.fsqCheckins
+      ? `<div class="map-fsq">🏃 ${b.fsqCheckins.toLocaleString()} check-ins</div>`
+      : '';
     const hoursHtml = b.hours?.todayHours
       ? `<div class="map-hours">${b.hours.todayHours}</div>`
       : '';
@@ -320,7 +323,7 @@ function initMap(breweries, centerCoords) {
           <div class="map-popup-body">
             <strong class="map-name">${x(b.name)}</strong>
             <div class="map-dist">${b.distanceMiles} mi · ${driveTime(b.distanceMiles)}</div>
-            ${yelpHtml}${hoursHtml}${beerHtml}${websiteHtml}
+            ${yelpHtml}${fsqHtml}${hoursHtml}${beerHtml}${websiteHtml}
           </div>
         </div>`, { maxWidth: 260 });
   });
@@ -722,6 +725,9 @@ function renderResults(data) {
         imageUrl:      beer.imageUrl      || null,
         priceRange:    beer.priceRange    || null,
         hours:         beer.hours         || null,
+        fsqCheckins:   beer.fsqCheckins   ?? null,
+        fsqPopularity: beer.fsqPopularity ?? null,
+        breweryType:   beer.breweryType   || null,
         topBeer:       { name: beer.name, style: beer.style },
       });
     }
@@ -874,6 +880,13 @@ function buildDetailHTML(data) {
   const ibuLabel = beer.ibuLabel || '';
   const ibuRange = beer.ibuRange || '';
 
+  // Style description panel
+  const styleDescHTML = beer.styleDescription ? `
+    <div class="detail-section detail-style-desc">
+      <div class="detail-section-label">📖 About ${x(beer.styleCategory || beer.style)}</div>
+      <p class="style-desc-text">${x(beer.styleDescription)}</p>
+    </div>` : '';
+
   const evHTML = events.length ? `
     <div class="detail-section">
       <div class="detail-section-label">📅 Upcoming Events</div>
@@ -975,6 +988,7 @@ function buildDetailHTML(data) {
       </div>
     </div>
 
+    ${styleDescHTML}
     ${foodHTML}
     ${evHTML}
     ${simHTML}`;
@@ -1054,6 +1068,8 @@ function buildFeaturedCard(beer) {
         ${beer.breweryAddress ? `<a class="directions-link" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(beer.breweryAddress)}" target="_blank" rel="noopener" title="Get directions">📍 Directions</a>` : ''}
       </div>
       ${beer.hours?.todayHours ? `<div class="hours-row">${beer.isClosed ? '🔴' : '🟢'} ${x(beer.hours.todayHours)}</div>` : ''}
+      ${beer.fsqCheckins ? `<div class="checkins-row">🏃 ${beer.fsqCheckins.toLocaleString()} Foursquare check-ins</div>` : ''}
+      ${beer.breweryType ? `<div class="brewery-type-badge">${breweryTypeLabel(beer.breweryType)}</div>` : ''}
       ${cardEvents(beer.events)}
       ${beer.id ? '<div class="tap-detail-hint">Tap for details →</div>' : ''}
     </div>
@@ -1177,8 +1193,8 @@ document.addEventListener('keydown', e => {
 
 // ── Event card ────────────────────────────────────────────
 function buildEventCard(ev) {
-  const srcCls  = ev.source === 'eventbrite' ? 'ev-eb' : 'ev-sc';
-  const srcText = ev.source === 'eventbrite' ? 'Eventbrite' : 'Brewery';
+  const srcCls  = ev.source === 'eventbrite' ? 'ev-eb' : ev.source === 'ticketmaster' ? 'ev-tm' : 'ev-sc';
+  const srcText = ev.source === 'eventbrite' ? 'Eventbrite' : ev.source === 'ticketmaster' ? 'Ticketmaster' : 'Brewery';
 
   const namePart = ev.url && ev.url !== '#'
     ? `<a class="ev-name" href="${x(ev.url)}" target="_blank" rel="noopener">${x(ev.name)}</a>`
@@ -1254,6 +1270,15 @@ function heartSVG(filled) {
 // ── Helpers ───────────────────────────────────────────────
 function tag(text, amber = false) {
   return `<span class="meta-tag${amber ? ' hit' : ''}">${text}</span>`;
+}
+
+function breweryTypeLabel(type) {
+  const labels = {
+    micro: '🍺 Microbrewery', nano: '🍺 Nano Brewery', regional: '🏭 Regional',
+    brewpub: '🍽️ Brewpub', large: '🏭 Large Brewery', planning: '🔧 Coming Soon',
+    bar: '🍻 Beer Bar', contract: '📄 Contract', proprietor: '🏠 Proprietor',
+  };
+  return labels[type] || type;
 }
 
 function x(str) {
