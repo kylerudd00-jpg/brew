@@ -58,11 +58,112 @@ const viewToggle     = document.getElementById('viewToggle');
 const tabBeers       = document.getElementById('tabBeers');
 const tabMap         = document.getElementById('tabMap');
 const mapView        = document.getElementById('mapView');
+const geoBtn         = document.getElementById('geoBtn');
+const filterBar      = document.getElementById('filterBar');
+const filterStyle    = document.getElementById('filterStyle');
+const filterSort     = document.getElementById('filterSort');
+const filterMinRating = document.getElementById('filterMinRating');
+const filterRadius   = document.getElementById('filterRadius');
+const filterApply    = document.getElementById('filterApply');
+const filterReset    = document.getElementById('filterReset');
+const loadMoreWrap   = document.getElementById('loadMoreWrap');
+const loadMoreBtn    = document.getElementById('loadMoreBtn');
+const loadMoreMeta   = document.getElementById('loadMoreMeta');
 
 // ── Map state ─────────────────────────────────────────────
 let _leafletMap     = null;
 let _activeView     = 'beers';
 let _lastBreweries  = [];
+
+// ── Search/pagination state ───────────────────────────────
+let _lastQuery      = '';
+let _currentPage    = 1;
+let _totalPages     = 1;
+let _activeFilters  = {};
+
+// ── URL state (auto-search on page load from ?q=) ─────────
+(function initFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const q = params.get('q') || params.get('zip');
+  if (q) {
+    // Wait for DOM to settle then kick off the search
+    requestAnimationFrame(() => {
+      zipInput.value = q;
+      doSearch(q);
+    });
+  }
+})();
+
+// ── Geolocation ───────────────────────────────────────────
+geoBtn.addEventListener('click', () => {
+  if (!navigator.geolocation) {
+    showFieldError('Geolocation is not supported by your browser.');
+    return;
+  }
+  geoBtn.disabled = true;
+  geoBtn.textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      try {
+        // Reverse geocode with Nominatim to get a city name
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const data = await res.json();
+        const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || '';
+        const state = data.address?.state_code || data.address?.state || '';
+        const label = city && state ? `${city}, ${state}` : city || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        zipInput.value = label;
+        clearError();
+        doSearch(label);
+      } catch {
+        // Fall back to raw coords as city search
+        zipInput.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        doSearch(zipInput.value);
+      } finally {
+        geoBtn.disabled = false;
+        geoBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z" opacity=".3"/></svg> Use my location`;
+      }
+    },
+    (err) => {
+      geoBtn.disabled = false;
+      geoBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z" opacity=".3"/></svg> Use my location`;
+      if (err.code === 1) showFieldError('Location access denied. Please allow location access.');
+      else showFieldError('Could not get your location. Try typing it instead.');
+    },
+    { timeout: 8000, maximumAge: 60000 }
+  );
+});
+
+// ── Filters ───────────────────────────────────────────────
+filterApply.addEventListener('click', () => {
+  _activeFilters = {};
+  if (filterStyle.value)       _activeFilters.style     = filterStyle.value;
+  if (filterSort.value !== 'score') _activeFilters.sort  = filterSort.value;
+  if (filterMinRating.value)   _activeFilters.minRating = filterMinRating.value;
+  if (filterRadius.value !== '15')  _activeFilters.maxMiles = filterRadius.value;
+  filterReset.hidden = Object.keys(_activeFilters).length === 0;
+  _currentPage = 1;
+  doSearch(_lastQuery, _activeFilters, 1);
+});
+
+filterReset.addEventListener('click', () => {
+  filterStyle.value     = '';
+  filterSort.value      = 'score';
+  filterMinRating.value = '';
+  filterRadius.value    = '15';
+  _activeFilters = {};
+  filterReset.hidden = true;
+  _currentPage = 1;
+  doSearch(_lastQuery, {}, 1);
+});
+
+loadMoreBtn.addEventListener('click', () => {
+  const nextPage = _currentPage + 1;
+  doSearchMore(_lastQuery, _activeFilters, nextPage);
+});
 
 function initMap(breweries, centerCoords) {
   _lastBreweries = breweries;
@@ -374,14 +475,32 @@ emptyBack.addEventListener('click', goHome);
 errorBack.addEventListener('click', goHome);
 
 // ── Search ────────────────────────────────────────────────
-async function doSearch(q) {
+function buildSearchUrl(q, filters = {}, page = 1) {
+  const p = new URLSearchParams({ q });
+  if (filters.style)     p.set('style',     filters.style);
+  if (filters.sort)      p.set('sort',      filters.sort);
+  if (filters.minRating) p.set('minRating', filters.minRating);
+  if (filters.maxMiles)  p.set('maxMiles',  filters.maxMiles);
+  if (page > 1)          p.set('page',      page);
+  p.set('limit', '8');
+  return `/search?${p}`;
+}
+
+async function doSearch(q, filters = {}, page = 1) {
+  _lastQuery = q;
+  _activeFilters = filters;
+  _currentPage = page;
   setLoading(true);
   hideAll();
   skeleton.hidden = false;
   hero.hidden = true;
 
+  // Push URL state (without triggering reload)
+  const urlParams = new URLSearchParams({ q });
+  history.replaceState(null, '', `?${urlParams}`);
+
   try {
-    const res  = await fetch(`/search?q=${encodeURIComponent(q)}`);
+    const res  = await fetch(buildSearchUrl(q, filters, page));
     const data = await res.json();
     if (!res.ok) throw Object.assign(new Error(data.error || 'Server error'), { status: res.status });
     renderResults(data);
@@ -396,6 +515,57 @@ async function doSearch(q) {
   }
 }
 
+async function doSearchMore(q, filters = {}, page = 1) {
+  loadMoreBtn.disabled = true;
+  loadMoreBtn.textContent = 'Loading…';
+
+  try {
+    const res  = await fetch(buildSearchUrl(q, filters, page));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Server error');
+
+    _currentPage = page;
+    _totalPages  = data.meta?.totalPages || 1;
+
+    const prefs  = loadPrefs();
+    const ranked = applyQuizRanking(data.topBeers || [], prefs);
+
+    // Append to existing grids (skip #1 on subsequent pages)
+    const startRank = (page - 1) * 8 + 1;
+    ranked.forEach((beer, i) => {
+      secGrid.appendChild(buildSecCard(beer, startRank + i + 1));
+    });
+
+    // Accumulate in window cache for quiz re-ranking awareness
+    if (window._lastTopBeers) window._lastTopBeers = [...window._lastTopBeers, ...data.topBeers];
+
+    updateLoadMore(data.meta);
+    requestAnimationFrame(() => setTimeout(animateFills, 80));
+  } catch (err) {
+    loadMoreBtn.textContent = 'Error — tap to retry';
+  } finally {
+    loadMoreBtn.disabled = false;
+  }
+}
+
+function updateLoadMore(meta) {
+  if (!meta) { loadMoreWrap.hidden = true; return; }
+  _totalPages = meta.totalPages || 1;
+  const shown = Math.min(_currentPage * 8, meta.totalBeers || meta.beerCount || 0);
+  const total = meta.totalBeers || meta.beerCount || 0;
+  if (_currentPage < _totalPages) {
+    loadMoreWrap.hidden = false;
+    loadMoreBtn.disabled = false;
+    loadMoreBtn.textContent = 'Load more beers';
+    loadMoreMeta.textContent = `Showing ${shown} of ${total}`;
+  } else {
+    loadMoreWrap.hidden = total <= 8;
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = 'All beers loaded';
+    loadMoreMeta.textContent = `${total} beers total`;
+  }
+}
+
 // ── Render results ────────────────────────────────────────
 function renderResults(data) {
   if (!data.topBeers?.length) { emptyState.hidden = false; return; }
@@ -406,6 +576,10 @@ function renderResults(data) {
 
   // Store coords so beer detail requests can filter similar beers by distance
   window._lastCoords = data.coords || null;
+
+  // Show filter bar
+  filterBar.hidden = false;
+  filterReset.hidden = Object.keys(_activeFilters).length === 0;
 
   metaBar.innerHTML = [
     tag(`🏭 ${data.meta.breweryCount} breweries`),
@@ -482,6 +656,8 @@ function renderResults(data) {
     evs.forEach(ev => eventsGrid.appendChild(buildEventCard(ev)));
     eventsSection.hidden = false;
   }
+
+  updateLoadMore(data.meta);
 
   results.hidden = false;
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -1025,6 +1201,8 @@ function hideAll() {
   weatherBanner.hidden = true;
   viewToggle.hidden    = true;
   mapView.hidden       = true;
+  filterBar.hidden     = true;
+  loadMoreWrap.hidden  = true;
   const banner = document.getElementById('personalizedBanner');
   if (banner) banner.hidden = true;
 }

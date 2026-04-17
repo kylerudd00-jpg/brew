@@ -62,6 +62,10 @@
           </button>
         </div>
         <p class="field-error" id="inputError" role="alert" hidden></p>
+        <button class="geo-btn" id="geoBtn" type="button" aria-label="Use my current location">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z" opacity=".3"/></svg>
+          Use my location
+        </button>
       </form>
 
       <div class="hero-chips">
@@ -127,11 +131,72 @@
       <button class="vtab" id="tabMap" data-view="map">🗺️ Map</button>
     </div>
 
+    <!-- Filter / Sort bar -->
+    <div class="filter-bar" id="filterBar" hidden>
+      <div class="filter-row">
+        <div class="filter-group">
+          <label class="filter-label">Style</label>
+          <select class="filter-select" id="filterStyle">
+            <option value="">Any style</option>
+            <option>IPA</option>
+            <option>Stout</option>
+            <option>Lager</option>
+            <option>Wheat</option>
+            <option>Sour</option>
+            <option>Pale Ale</option>
+            <option>Amber / Red</option>
+            <option>Brown Ale</option>
+            <option>Belgian</option>
+            <option>Barleywine</option>
+            <option>Cider</option>
+            <option>Mead</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Sort by</label>
+          <select class="filter-select" id="filterSort">
+            <option value="score">Best match</option>
+            <option value="rating">Highest rated</option>
+            <option value="distance">Closest first</option>
+            <option value="reviews">Most reviewed</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Min rating</label>
+          <select class="filter-select" id="filterMinRating">
+            <option value="">Any</option>
+            <option value="3">3.0+</option>
+            <option value="3.5">3.5+</option>
+            <option value="4">4.0+</option>
+            <option value="4.5">4.5+</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Radius</label>
+          <select class="filter-select" id="filterRadius">
+            <option value="5">5 mi</option>
+            <option value="10">10 mi</option>
+            <option value="15" selected>15 mi</option>
+            <option value="25">25 mi</option>
+            <option value="50">50 mi</option>
+          </select>
+        </div>
+        <button class="filter-apply-btn" id="filterApply">Apply</button>
+        <button class="filter-reset-btn" id="filterReset" hidden>✕ Reset</button>
+      </div>
+    </div>
+
     <!-- #1 Featured -->
     <div id="featuredWrap"></div>
 
-    <!-- #2–5 -->
+    <!-- #2+ -->
     <div class="secondary-grid" id="secondaryGrid"></div>
+
+    <!-- Load more -->
+    <div class="load-more-wrap" id="loadMoreWrap" hidden>
+      <button class="load-more-btn" id="loadMoreBtn">Load more beers</button>
+      <span class="load-more-meta" id="loadMoreMeta"></span>
+    </div>
 
     <!-- Map view -->
     <div id="mapView" hidden>
