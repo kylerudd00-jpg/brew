@@ -272,6 +272,8 @@ router.get('/', async (req, res, next) => {
         radiusMiles:  maxMiles,
         cachedAt:     new Date().toISOString(),
         fromCache:    false,
+        hasYelp:      !!process.env.YELP_API_KEY,
+        hasFoursquare: !!process.env.FOURSQUARE_KEY,
       },
     };
 

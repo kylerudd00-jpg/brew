@@ -809,7 +809,7 @@ function renderResults(data) {
     tag(`📍 ${data.meta.radiusMiles} mi radius`),
     data.meta.fromCache ? tag('⚡ Cached', true) : '',
     data.mock ? tag('DEMO', true) : '',
-    process.env?.YELP_API_KEY ? tag('Yelp', true) : '',
+    data.meta?.hasYelp ? tag('Yelp', true) : '',
   ].filter(Boolean).join('');
 
   // Weather banner
